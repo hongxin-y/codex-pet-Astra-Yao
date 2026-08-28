@@ -2,5 +2,6 @@
   "id": "astra-yao",
   "displayName": "Astra Yao",
   "description": "A tiny Codex desktop pet inspired by Astra Yao: dark teal long-haired stage singer with red-black jacket, white dress, and tall gold ring microphone staff.",
+  "spriteVersionNumber": 2,
   "spritesheetPath": "spritesheet.webp"
 }

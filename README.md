@@ -14,8 +14,8 @@ codex-pet-Astra-Yao/
 `-- USAGE.md
 ```
 
-- `pet.json`: Codex pet manifest. It defines the pet ID, display name, description, and spritesheet path.
-- `spritesheet.webp`: Animated spritesheet used by Codex Desktop.
+- `pet.json`: Codex pet manifest. It defines the pet ID, display name, description, sprite version, and spritesheet path.
+- `spritesheet.webp`: Codex v2 animated spritesheet, including the standard animations and 16 look directions.
 - `README.md`: Package overview.
 - `USAGE.md`: Installation and configuration guide.
 
@@ -26,6 +26,7 @@ codex-pet-Astra-Yao/
   "id": "astra-yao",
   "displayName": "Astra Yao",
   "description": "A tiny Codex desktop pet inspired by Astra Yao: dark teal long-haired stage singer with red-black jacket, white dress, and tall gold ring microphone staff.",
+  "spriteVersionNumber": 2,
   "spritesheetPath": "spritesheet.webp"
 }
 ```
@@ -35,14 +36,12 @@ codex-pet-Astra-Yao/
 Copy this folder into your local Codex pets directory:
 
 ```powershell
-Copy-Item -Path "C:\repos\codex-pet-Astra-Yao" -Destination "$env:USERPROFILE\.codex\pets\astra-yao" -Recurse -Force
+$source = "C:\repos\codex-pet-Astra-Yao-main\codex-pet-Astra-Yao-main"
+Copy-Item -Path $source -Destination "$env:USERPROFILE\.codex\pets\astra-yao" -Recurse -Force
 ```
 
 Then restart Codex Desktop if the pet does not appear immediately.
 
 ## Asset Notes
 
-The current spritesheet is `1536x1872`, matching the 8-column x 9-row standard Codex pet layout.
-
-Do not add `"spriteVersionNumber": 2` to `pet.json` unless the spritesheet is upgraded to a `1536x2288` v2 atlas.
-
+The spritesheet is `1536x2288`, matching the Codex v2 8-column x 11-row layout. Rows 0–8 contain the standard animations; rows 9–10 contain 16 clockwise look directions. The manifest therefore declares `"spriteVersionNumber": 2`.

@@ -29,7 +29,8 @@ astra-yao/
 在 PowerShell 中运行：
 
 ```powershell
-Copy-Item -Path "C:\repos\codex-pet-Astra-Yao" -Destination "$env:USERPROFILE\.codex\pets\astra-yao" -Recurse -Force
+$source = "C:\repos\codex-pet-Astra-Yao-main\codex-pet-Astra-Yao-main"
+Copy-Item -Path $source -Destination "$env:USERPROFILE\.codex\pets\astra-yao" -Recurse -Force
 ```
 
 安装后目录应为：
@@ -51,6 +52,7 @@ C:\Users\yangh6\.codex\pets\astra-yao\
   "id": "astra-yao",
   "displayName": "Astra Yao",
   "description": "A tiny Codex desktop pet inspired by Astra Yao: dark teal long-haired stage singer with red-black jacket, white dress, and tall gold ring microphone staff.",
+  "spriteVersionNumber": 2,
   "spritesheetPath": "spritesheet.webp"
 }
 ```
@@ -60,19 +62,12 @@ C:\Users\yangh6\.codex\pets\astra-yao\
 - `id`: 宠物唯一 ID。建议使用小写英文、数字和连字符，例如 `astra-yao`。
 - `displayName`: Codex 界面中展示的名称，例如 `Astra Yao`。
 - `description`: 宠物外观或来源的一句话描述。
+- `spriteVersionNumber`: 动画表版本。当前为 `2`，启用扩展的观察方向动画。
 - `spritesheetPath`: 动画图文件路径。当前指向同目录下的 `spritesheet.webp`。
 
 ## 4. 关于 spritesheet 版本
 
-当前 `spritesheet.webp` 尺寸是 `1536x1872`，对应 8 列 x 9 行的标准动画表。
-
-因此当前 `pet.json` 不需要，也不应该添加：
-
-```json
-"spriteVersionNumber": 2
-```
-
-只有当素材升级为 `1536x2288`、8 列 x 11 行的 v2 动画表时，才应添加 `"spriteVersionNumber": 2`。
+当前 `spritesheet.webp` 尺寸是 `1536x2288`，对应 8 列 x 11 行的 v2 动画表。第 0–8 行是标准动画，第 9–10 行提供顺时针排列的 16 个观察方向，因此 `pet.json` 必须包含 `"spriteVersionNumber": 2`。
 
 ## 5. 验证安装
 
@@ -93,6 +88,7 @@ spritesheet.webp
 
 - `pet.json` 是否是合法 JSON。
 - `spritesheetPath` 是否指向真实存在的文件。
+- `spriteVersionNumber` 是否为 `2`。
 - 安装目录是否为 `%USERPROFILE%\.codex\pets\astra-yao`。
 - `pet.json` 里的 `id` 是否为 `astra-yao`。
 
@@ -107,4 +103,3 @@ spritesheet.webp
 ```
 
 然后重启 Codex Desktop。
-
