@@ -138,6 +138,7 @@ test('state endpoint describes the plugin, the pet atlas and the session', async
   assert.equal(body.pet.id, PET_ID)
   assert.equal(body.pet.spriteVersionNumber, 2)
   assert.equal(body.pet.spritesheetPath, ENDPOINTS.spritesheet)
+  assert.match(String(body.pet.sheetVersion), /^\d+-\d+$/, 'the sheet revision bumps when the file changes')
   assert.equal(body.pet.atlas.animations.idle.row, 0)
   assert.equal(body.pet.atlas.lookCells, 16)
   assert.equal(body.session.state, 'thinking')

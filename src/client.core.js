@@ -345,6 +345,7 @@ let baseSince = 0
 let baseTimer = 0
 let currentAnimation = null
 let lookCell = null
+let loadedSheetVersion = null
 let spriteWidth = 0
 let lastPainted = { row: -1, column: -1, width: 0 }
 let customPosition = false
@@ -957,6 +958,7 @@ async function poll() {
 function onSnapshot(payload) {
   if (!payload || typeof payload !== 'object') return
   if (payload.config && typeof payload.config === 'object') applyConfig(payload.config)
+  if (payload.pet && typeof payload.pet === 'object') applySheet(payload.pet.sheetVersion)
 
   const nextSession = payload.session
   if (nextSession && typeof nextSession === 'object') {
@@ -1201,6 +1203,22 @@ function listen(target, type, handler, options) {
 // Lifecycle
 // ---------------------------------------------------------------------------
 
+/**
+ * Point the sprite at the current sheet revision. The host versions the file
+ * by mtime + size, so a regenerated atlas busts the browser cache instead of
+ * leaving the old pixels on screen (which is what made a fixed wave row still
+ * look broken after a refresh).
+ */
+function applySheet(version) {
+  if (!spriteEl) return
+  const next = version ? String(version) : ''
+  if (next === loadedSheetVersion) return
+  loadedSheetVersion = next
+  const suffix = next ? `?v=${encodeURIComponent(next)}` : ''
+  spriteEl.style.backgroundImage = `url("${apiUrl(`/plugins/${PLUGIN_ID}/assets/spritesheet.webp`)}${suffix}")`
+  lastPainted = { row: -1, column: -1, width: 0 }
+}
+
 function mount() {
   if (disposed) return
   if (document.getElementById(ROOT_ID)) return
@@ -1224,7 +1242,7 @@ function mount() {
   bubbleUsageEl = shadow.querySelector('.bubble-usage')
   menuBalanceEl = shadow.querySelector('.menu-balance')
 
-  spriteEl.style.backgroundImage = `url("${apiUrl(`/plugins/${PLUGIN_ID}/assets/spritesheet.webp`)}")`
+  applySheet(loadedSheetVersion)
 
   document.body.appendChild(host)
 

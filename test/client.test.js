@@ -424,14 +424,33 @@ test('teardown removes the widget and unregisters the debug handle', () => {
 // Session state: bubble text and the anti-flicker base pose
 // ---------------------------------------------------------------------------
 
-function sessionPayload(session, config = {}) {
-  return { ok: true, config, session, serverTime: 1 }
+function sessionPayload(session, config = {}, pet = undefined) {
+  const payload = { ok: true, config, session, serverTime: 1 }
+  if (pet) payload.pet = pet
+  return payload
 }
 
-function feed(env, session, config = {}) {
-  env.sandbox.fetch = async () => ({ ok: true, status: 200, json: async () => sessionPayload(session, config) })
+function feed(env, session, config = {}, pet = undefined) {
+  env.sandbox.fetch = async () => ({ ok: true, status: 200, json: async () => sessionPayload(session, config, pet) })
   return env.runTimer()
 }
+
+test('a new sheet revision replaces the cached spritesheet URL', async () => {
+  const { env } = applyWidget()
+  const shadow = env.body.children[0]._shadow
+  const sprite = shadow.querySelector('.sprite')
+  env.pump(0)
+  assert.ok(!sprite.style.backgroundImage.includes('?v='), 'the first paint uses the bare asset URL')
+
+  await feed(env, { active: true, sessionId: 's1', state: 'idle', pulse: null }, {}, { sheetVersion: '1790000000000-2710386' })
+  assert.ok(
+    sprite.style.backgroundImage.includes('?v=1790000000000-2710386'),
+    'a regenerated atlas gets a cache-busting revision in the image URL',
+  )
+
+  await feed(env, { active: true, sessionId: 's1', state: 'idle', pulse: null }, {}, { sheetVersion: '1790000000000-2710386' })
+  assert.ok(sprite.style.backgroundImage.includes('?v=1790000000000-2710386'), 'the same revision is not re-applied')
+})
 
 test('the status bubble mirrors the session and honours showBubble', async () => {
   const { env } = applyWidget()

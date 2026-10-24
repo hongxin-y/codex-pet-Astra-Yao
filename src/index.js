@@ -150,7 +150,13 @@ export function createHandlers({ tracker, store, assets = {}, version = VERSION,
     res.end(entry.data)
   }
 
-  function serveState(_req, res) {
+  async function serveState(_req, res) {
+    let sheetVersion = 'unknown'
+    try {
+      sheetVersion = (await readAsset(spriteFile)).version
+    } catch {
+      sheetVersion = 'missing'
+    }
     jsonResponse(res, 200, {
       ok: true,
       plugin: { key: PLUGIN_KEY, name, version },
@@ -161,6 +167,9 @@ export function createHandlers({ tracker, store, assets = {}, version = VERSION,
         spriteVersionNumber: SPRITE_VERSION,
         spritesheetPath: ENDPOINTS.spritesheet,
         manifestPath: ENDPOINTS.manifest,
+        // Bumped from the file's mtime + size; the client appends it to the
+        // background-image URL so a replaced sheet cannot stay cached.
+        sheetVersion,
         atlas: describeAtlas(),
       },
       session: tracker.snapshot(),
