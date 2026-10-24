@@ -36,15 +36,24 @@ const POLL_RETRY_MS = 4000
 const POLL_HIDDEN_MS = 8000
 const POLL_TIMEOUT_MS = 5000
 const PATCH_DEBOUNCE_MS = 180
+/** A working/thinking flip must be stable this long before the base pose changes. */
+const BASE_HOLD_MS = 1500
+/** Idle bubbles fade out after this much quiet time. */
+const BUBBLE_IDLE_MS = 10_000
+/** Balance is re-read at most this often. */
+const BALANCE_TTL_MS = 60_000
 
 const DEFAULT_CONFIG = Object.freeze({
   enabled: true,
   scale: 1,
   opacity: 1,
+  speed: 1,
   mirror: false,
   locked: false,
   hidden: false,
   paused: false,
+  showBubble: true,
+  showBubbleUsage: false,
   posX: null,
   posY: null,
 })
@@ -55,6 +64,26 @@ const STATE_LABELS = Object.freeze({
   working: '执行中',
   waiting: '等待确认',
   error: '出错了',
+})
+
+const WAITING_LABELS = Object.freeze({
+  ask: '等你回答',
+  'plan-review': '等你确认计划',
+  approval: '等你批准',
+})
+
+const ERROR_LABELS = Object.freeze({
+  blocked: '任务被阻塞',
+  'max-tokens': '超出上下文上限',
+  error: '对话失败',
+})
+
+const BASE_PRIORITY = Object.freeze({
+  idle: 0,
+  thinking: 1,
+  working: 2,
+  waiting: 3,
+  error: 4,
 })
 
 const TEMPLATE = `
@@ -92,6 +121,42 @@ const TEMPLATE = `
     pointer-events: auto;
   }
   .ghost:hover { background: rgba(120, 200, 255, .65); }
+  .bubble {
+    position: fixed;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-width: 236px;
+    padding: 7px 10px 8px;
+    border-radius: 10px;
+    background: rgba(16, 18, 24, .94);
+    color: #e6ecf7;
+    font: 11px/1.5 "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, .42), 0 0 0 1px rgba(255, 255, 255, .07) inset;
+    backdrop-filter: blur(10px);
+    pointer-events: none;
+    transition: opacity .15s ease;
+  }
+  .bubble[hidden] { display: none; }
+  .bubble-main { display: flex; align-items: baseline; gap: 6px; }
+  .bubble-state { font-size: 11.5px; font-weight: 600; color: #8fd0ff; white-space: nowrap; }
+  .bubble-detail {
+    color: #d7deea;
+    max-width: 158px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .bubble-sub {
+    color: #8c99ad;
+    font-size: 10.5px;
+    max-width: 212px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .bubble-usage { color: #9fd7a8; font-size: 10.5px; white-space: nowrap; }
+  .bubble-sub[hidden], .bubble-usage[hidden], .bubble-detail[hidden] { display: none; }
   .menu {
     position: fixed;
     width: 214px;
@@ -146,9 +211,24 @@ const TEMPLATE = `
     font-size: 10px;
     text-align: right;
   }
+  .menu-balance {
+    margin-top: 6px;
+    color: #9fd7a8;
+    font-size: 10.5px;
+    text-align: right;
+  }
+  .menu-balance[hidden] { display: none; }
 </style>
 <div class="pet" title="Astra Yao">
   <div class="sprite"></div>
+</div>
+<div class="bubble" hidden>
+  <div class="bubble-main">
+    <span class="bubble-state">待机</span>
+    <span class="bubble-detail" hidden></span>
+  </div>
+  <div class="bubble-sub" hidden></div>
+  <div class="bubble-usage" hidden></div>
 </div>
 <div class="ghost" title="显示 Astra Yao" hidden></div>
 <div class="menu" hidden>
@@ -157,14 +237,18 @@ const TEMPLATE = `
     <span class="menu-state">待机</span>
   </div>
   <label class="row"><span>显示桌宠</span><input type="checkbox" data-field="hidden"></label>
+  <label class="row"><span>状态气泡</span><input type="checkbox" data-field="showBubble"></label>
+  <label class="row"><span>显示余额</span><input type="checkbox" data-field="showBubbleUsage"></label>
   <label class="row"><span>大小</span><input type="range" data-field="scale" min="0.5" max="2" step="0.05"></label>
   <label class="row"><span>不透明度</span><input type="range" data-field="opacity" min="0.3" max="1" step="0.05"></label>
+  <label class="row"><span>动画速度</span><input type="range" data-field="speed" min="0.5" max="1.6" step="0.05"></label>
   <label class="row"><span>锁定位置</span><input type="checkbox" data-field="locked"></label>
   <label class="row"><span>左右镜像</span><input type="checkbox" data-field="mirror"></label>
   <div class="menu-actions">
     <button type="button" data-action="reset">回右下角</button>
     <button type="button" data-action="ack">我知道了</button>
   </div>
+  <div class="menu-balance" hidden></div>
   <div class="foot">DeepSeek Harness · v__PET_VERSION__</div>
 </div>
 `
@@ -176,10 +260,20 @@ let spriteEl = null
 let ghostEl = null
 let menuEl = null
 let stateEl = null
+let bubbleEl = null
+let bubbleStateEl = null
+let bubbleDetailEl = null
+let bubbleSubEl = null
+let bubbleUsageEl = null
+let menuBalanceEl = null
 
 let cfg = { ...DEFAULT_CONFIG }
 let session = null
 let snapshotState = 'idle'
+/** Base pose actually on screen; lags `snapshotState` on purpose (hysteresis). */
+let baseState = 'idle'
+let baseSince = 0
+let baseTimer = 0
 let currentAnimation = null
 let lookCell = null
 let spriteWidth = 0
@@ -189,6 +283,7 @@ let disposed = false
 let online = false
 let pollFailures = 0
 let lastPulseId = 0
+let lastActiveAt = Date.now()
 let menuOpen = false
 let rafId = 0
 let pollTimer = 0
@@ -196,6 +291,9 @@ let patchTimers = new Map()
 let drag = null
 let resolveBase = ''
 let lastLookAt = 0
+let balanceData = null
+let balanceCheckedAt = 0
+let balancePending = false
 /** Fields with a local edit in flight: server echoes are ignored until they settle. */
 const pendingFields = new Map()
 
@@ -292,6 +390,7 @@ function place(left, top) {
   petEl.style.top = `${y}px`
   petEl.style.right = 'auto'
   petEl.style.bottom = 'auto'
+  positionBubble()
 }
 
 function placeGhost() {
@@ -318,23 +417,61 @@ function paint(row, column) {
 
 function play(name, options = {}) {
   const animation = animationOf(name)
+  const interval = Math.max(40, Math.round(animation.interval / speedFactor()))
   currentAnimation = {
     name,
     row: animation.row,
     frames: animation.frames,
-    interval: animation.interval,
+    interval,
     startedAt: performance.now(),
     once: Boolean(options.once),
   }
 }
 
+function speedFactor() {
+  const value = Number(cfg.speed)
+  return Number.isFinite(value) ? clamp(value, 0.5, 1.6) : 1
+}
+
 function playBase() {
-  const name = MOOD_ANIMATIONS[snapshotState] ?? 'idle'
-  play(name)
+  play(MOOD_ANIMATIONS[baseState] ?? 'idle')
 }
 
 function baseAnimationName() {
-  return MOOD_ANIMATIONS[snapshotState] ?? 'idle'
+  return MOOD_ANIMATIONS[baseState] ?? 'idle'
+}
+
+function commitBase(next) {
+  baseState = next
+  baseSince = Date.now()
+  if (currentAnimation?.once) return
+  if (currentAnimation && currentAnimation.name === (MOOD_ANIMATIONS[next] ?? 'idle')) return
+  playBase()
+}
+
+/**
+ * Change the base pose with hysteresis: escalations are instant, relaxations
+ * wait until the current pose has been on screen for BASE_HOLD_MS. Without this
+ * a turn that alternates thinking/work on every poll restarts the walk cycle
+ * every second and reads as a twitch.
+ */
+function requestBase(next) {
+  const target = String(next ?? 'idle')
+  if (target === baseState) return
+  const now = Date.now()
+  const up = (BASE_PRIORITY[target] ?? 0) >= (BASE_PRIORITY[baseState] ?? 0)
+  if (up || target === 'idle' || now - baseSince >= BASE_HOLD_MS) {
+    clearTimeout(baseTimer)
+    baseTimer = 0
+    commitBase(target)
+    return
+  }
+  if (baseTimer) return
+  baseTimer = setTimeout(() => {
+    baseTimer = 0
+    if (disposed) return
+    commitBase(String(snapshotState ?? 'idle'))
+  }, Math.max(120, BASE_HOLD_MS - (now - baseSince)))
 }
 
 function frameLoop(now) {
@@ -367,19 +504,161 @@ function setState(nextState) {
   const state = String(nextState ?? 'idle')
   const changed = state !== snapshotState
   snapshotState = state
+  if (state !== 'idle') lastActiveAt = Date.now()
   if (stateEl) stateEl.textContent = STATE_LABELS[state] ?? state
-  if (changed && !currentAnimation?.once) playBase()
+  if (changed) requestBase(state)
   updateTooltip()
+  renderBubble()
 }
 
 function updateTooltip() {
   if (!petEl) return
   const parts = ['Astra Yao']
   parts.push(STATE_LABELS[snapshotState] ?? snapshotState)
+  const detail = detailText()
+  if (detail) parts.push(detail)
   if (session?.project) parts.push(session.project)
   if (session?.title) parts.push(session.title)
   if (!online) parts.push('未连接')
   petEl.title = parts.join(' · ')
+}
+
+// ---------------------------------------------------------------------------
+// Status bubble
+// ---------------------------------------------------------------------------
+
+function shorten(value, max) {
+  const text = String(value ?? '').replace(/\s+/gu, ' ').trim()
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text
+}
+
+function balanceSymbol(currency) {
+  return String(currency || '').toUpperCase() === 'USD' ? '$' : '¥'
+}
+
+function money(value) {
+  const number = Number(value)
+  return Number.isFinite(number) ? number.toFixed(2) : '--'
+}
+
+function detailText() {
+  if (!session || !session.active) return ''
+  if (snapshotState === 'working' || snapshotState === 'thinking') return shorten(session.activity, 24)
+  if (snapshotState === 'waiting') return shorten(session.activity || WAITING_LABELS[session.waitingKind] || '', 24)
+  if (snapshotState === 'error') {
+    return shorten(session.errorText, 40) || ERROR_LABELS[session.errorKind] || '点我一下确认'
+  }
+  return ''
+}
+
+function subText() {
+  if (!session || !session.active) return online ? '' : '未连接'
+  const parts = []
+  if (session.project) parts.push(shorten(session.project, 18))
+  if (session.title) parts.push(shorten(session.title, 26))
+  return parts.join(' · ')
+}
+
+function usageText() {
+  if (!cfg.showBubbleUsage) return ''
+  if (balancePending && !balanceData) return '余额查询中…'
+  if (!balanceData) return ''
+  if (balanceData.ok) {
+    const symbol = balanceSymbol(balanceData.currency)
+    const today = Number(balanceData.todayUsage) > 0 ? ` · 今日 ${symbol}${money(balanceData.todayUsage)}` : ''
+    return `余额 ${symbol}${money(balanceData.totalBalance)}${today}${balanceData.stale ? '（缓存）' : ''}`
+  }
+  const reason = balanceData.code === 'NO_KEY' ? '未配置 API Key' : shorten(balanceData.error, 40) || '不可用'
+  return `余额不可用：${reason}`
+}
+
+function bubbleVisible() {
+  if (!cfg.showBubble || cfg.hidden || !bubbleEl) return false
+  if (snapshotState !== 'idle') return true
+  if (session?.pulse) return true
+  return Date.now() - lastActiveAt < BUBBLE_IDLE_MS
+}
+
+function positionBubble() {
+  if (!bubbleEl || !petEl || bubbleEl.hidden) return
+  const petRect = petEl.getBoundingClientRect()
+  const rect = bubbleEl.getBoundingClientRect()
+  const margin = 8
+  let left = petRect.right - rect.width
+  left = clamp(left, margin, Math.max(margin, window.innerWidth - rect.width - margin))
+  let top = petRect.top - rect.height - 8
+  if (top < margin) top = Math.min(window.innerHeight - rect.height - margin, petRect.bottom + 8)
+  bubbleEl.style.left = `${Math.round(left)}px`
+  bubbleEl.style.top = `${Math.round(top)}px`
+}
+
+function renderBubble() {
+  if (!bubbleEl) return
+  if (bubbleStateEl) bubbleStateEl.textContent = STATE_LABELS[snapshotState] ?? snapshotState
+  const detail = detailText()
+  if (bubbleDetailEl) {
+    bubbleDetailEl.hidden = !detail
+    if (detail) bubbleDetailEl.textContent = detail
+  }
+  const sub = subText()
+  if (bubbleSubEl) {
+    bubbleSubEl.hidden = !sub
+    if (sub) bubbleSubEl.textContent = sub
+  }
+  const usage = usageText()
+  if (bubbleUsageEl) {
+    bubbleUsageEl.hidden = !usage
+    if (usage) bubbleUsageEl.textContent = usage
+  }
+  bubbleEl.hidden = !bubbleVisible()
+  if (!bubbleEl.hidden) positionBubble()
+  if (cfg.showBubbleUsage) maybeRefreshBalance()
+  syncMenuBalance()
+}
+
+function maybeRefreshBalance() {
+  if (!cfg.showBubbleUsage || balancePending) return
+  if (Date.now() - balanceCheckedAt < BALANCE_TTL_MS) return
+  fetchBalance(false)
+}
+
+function fetchBalance(force) {
+  if (balancePending || disposed) return
+  balancePending = true
+  balanceCheckedAt = Date.now()
+  const suffix = force ? '?refresh=1' : ''
+  let request
+  try {
+    request = fetch(apiUrl(`/plugins/${PLUGIN_ID}/balance${suffix}`), {
+      cache: 'no-store',
+      credentials: 'same-origin',
+      headers: { accept: 'application/json' },
+    })
+  } catch {
+    balancePending = false
+    return
+  }
+  Promise.resolve(request)
+    .then((response) => (response && response.ok ? response.json() : null))
+    .then((payload) => {
+      if (payload && payload.balance) balanceData = payload.balance
+      else if (!balanceData) balanceData = { ok: false, code: 'HTTP', error: '余额接口不可用' }
+    })
+    .catch(() => {
+      if (!balanceData) balanceData = { ok: false, code: 'OFFLINE', error: '无法连接' }
+    })
+    .then(() => {
+      balancePending = false
+      if (disposed) return
+      renderBubble()
+    })
+}
+
+function syncMenuBalance() {
+  if (!menuBalanceEl) return
+  const text = cfg.showBubbleUsage ? usageText() : ''
+  menuBalanceEl.hidden = !text
+  if (text) menuBalanceEl.textContent = text
 }
 
 function applyConfig(next, options = {}) {
@@ -394,6 +673,7 @@ function applyConfig(next, options = {}) {
     accepted[key] = value
   }
   if (Object.keys(accepted).length === 0) return
+  const previousSpeed = speedFactor()
   cfg = { ...cfg, ...accepted }
   if (!petEl) return
 
@@ -428,6 +708,8 @@ function applyConfig(next, options = {}) {
 
   if (menuOpen) syncMenu()
   if (!currentAnimation) playBase()
+  else if (speedFactor() !== previousSpeed) play(currentAnimation.name, { once: currentAnimation.once })
+  renderBubble()
 }
 
 function syncMenu() {
@@ -435,10 +717,14 @@ function syncMenu() {
   menuEl.querySelector('[data-field="hidden"]').checked = !cfg.hidden
   menuEl.querySelector('[data-field="locked"]').checked = Boolean(cfg.locked)
   menuEl.querySelector('[data-field="mirror"]').checked = Boolean(cfg.mirror)
+  menuEl.querySelector('[data-field="showBubble"]').checked = cfg.showBubble !== false
+  menuEl.querySelector('[data-field="showBubbleUsage"]').checked = Boolean(cfg.showBubbleUsage)
   menuEl.querySelector('[data-field="scale"]').value = String(cfg.scale)
   menuEl.querySelector('[data-field="opacity"]').value = String(cfg.opacity)
+  menuEl.querySelector('[data-field="speed"]').value = String(speedFactor())
   const stateNode = menuEl.querySelector('.menu-state')
   if (stateNode) stateNode.textContent = STATE_LABELS[snapshotState] ?? snapshotState
+  syncMenuBalance()
 }
 
 function openMenu(clientX, clientY) {
@@ -509,6 +795,7 @@ function onSnapshot(payload) {
     }
   }
   updateTooltip()
+  renderBubble()
 }
 
 function sendPatch(fields) {
@@ -679,11 +966,11 @@ function onMenuInput(event) {
     sendPatch({ hidden: !event.target.checked })
     return
   }
-  if (field === 'locked' || field === 'mirror') {
+  if (field === 'locked' || field === 'mirror' || field === 'showBubble' || field === 'showBubbleUsage') {
     sendPatch({ [field]: event.target.checked })
     return
   }
-  if (field === 'scale' || field === 'opacity') {
+  if (field === 'scale' || field === 'opacity' || field === 'speed') {
     const value = Number(event.target.value)
     applyConfig({ [field]: value })
     queuePatch({ [field]: value })
@@ -733,6 +1020,12 @@ function mount() {
   ghostEl = shadow.querySelector('.ghost')
   menuEl = shadow.querySelector('.menu')
   stateEl = shadow.querySelector('.menu-state')
+  bubbleEl = shadow.querySelector('.bubble')
+  bubbleStateEl = shadow.querySelector('.bubble-state')
+  bubbleDetailEl = shadow.querySelector('.bubble-detail')
+  bubbleSubEl = shadow.querySelector('.bubble-sub')
+  bubbleUsageEl = shadow.querySelector('.bubble-usage')
+  menuBalanceEl = shadow.querySelector('.menu-balance')
 
   spriteEl.style.backgroundImage = `url("${apiUrl(`/plugins/${PLUGIN_ID}/assets/spritesheet.webp`)}")`
 
@@ -760,9 +1053,13 @@ function mount() {
   })
 
   spriteWidth = 0
+  baseState = snapshotState
+  baseSince = Date.now()
+  lastActiveAt = Date.now()
   applyConfig(cfg)
   playBase()
   updateTooltip()
+  renderBubble()
   rafId = requestAnimationFrame(frameLoop)
   schedulePoll(120)
 
@@ -772,7 +1069,7 @@ function mount() {
     acknowledge,
     teardown,
     get snapshot() {
-      return { state: snapshotState, online, config: { ...cfg }, session }
+      return { state: snapshotState, baseState, online, config: { ...cfg }, session, balance: balanceData }
     },
   }
 }
@@ -782,6 +1079,7 @@ function teardown() {
   disposed = true
   cancelAnimationFrame(rafId)
   clearTimeout(pollTimer)
+  clearTimeout(baseTimer)
   patchTimers.forEach((timer) => clearTimeout(timer))
   patchTimers.clear()
   for (const cleanup of cleanups.splice(0)) {

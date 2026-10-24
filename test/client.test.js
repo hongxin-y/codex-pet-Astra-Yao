@@ -217,6 +217,15 @@ function createSandbox() {
       timers.delete(id)
       return timer.callback()
     },
+    /** Run the first pending timer whose delay matches the predicate. */
+    runTimerMatching(predicate) {
+      for (const [id, timer] of [...timers.entries()]) {
+        if (!predicate(timer)) continue
+        timers.delete(id)
+        return timer.callback()
+      }
+      return undefined
+    },
     load() {
       assert.ok(capture, 'the bundle must call window.__ModuleLoader__.load')
       return capture
@@ -387,4 +396,129 @@ test('teardown removes the widget and unregisters the debug handle', () => {
   handle.teardown()
   assert.equal(env.body.children.length, 0)
   assert.equal(env.sandbox.__DSH_PET_ASTRA_YAO__, undefined)
+})
+
+// ---------------------------------------------------------------------------
+// Session state: bubble text and the anti-flicker base pose
+// ---------------------------------------------------------------------------
+
+function sessionPayload(session) {
+  return { ok: true, config: {}, session, serverTime: 1 }
+}
+
+function feed(env, session) {
+  env.sandbox.fetch = async () => ({ ok: true, status: 200, json: async () => sessionPayload(session) })
+  return env.runTimer()
+}
+
+test('the status bubble mirrors the session and honours showBubble', async () => {
+  const { env } = applyWidget()
+  const shadow = env.body.children[0]._shadow
+  const bubble = shadow.querySelector('.bubble')
+  const bubbleState = shadow.querySelector('.bubble-state')
+  const bubbleDetail = shadow.querySelector('.bubble-detail')
+  const bubbleSub = shadow.querySelector('.bubble-sub')
+
+  await feed(env, {
+    active: true,
+    sessionId: 's1',
+    state: 'working',
+    activity: 'shell',
+    waitingKind: '',
+    errorKind: '',
+    errorText: '',
+    title: '修 bug',
+    project: 'pet-astra-yao',
+    pulse: null,
+  })
+
+  assert.equal(bubble.hidden, false)
+  assert.equal(bubbleState.textContent, '执行中')
+  assert.equal(bubbleDetail.hidden, false)
+  assert.equal(bubbleDetail.textContent, 'shell')
+  assert.equal(bubbleSub.textContent, 'pet-astra-yao · 修 bug')
+
+  const handle = env.sandbox.__DSH_PET_ASTRA_YAO__
+  handle.patch({ showBubble: false })
+  await Promise.resolve()
+  assert.equal(bubble.hidden, true, 'turning the bubble off hides it immediately')
+
+  handle.patch({ showBubble: true, showBubbleUsage: true })
+  await Promise.resolve()
+  assert.equal(bubble.hidden, false)
+})
+
+test('a failed turn shows the error text until acknowledged', async () => {
+  const { env } = applyWidget()
+  const shadow = env.body.children[0]._shadow
+  const bubbleState = shadow.querySelector('.bubble-state')
+  const bubbleDetail = shadow.querySelector('.bubble-detail')
+
+  await feed(env, {
+    active: true,
+    sessionId: 's1',
+    state: 'error',
+    activity: '',
+    waitingKind: '',
+    errorKind: 'error',
+    errorText: 'HTTP 500 from the model gateway',
+    title: null,
+    project: null,
+    pulse: null,
+  })
+  assert.equal(bubbleState.textContent, '出错了')
+  assert.equal(bubbleDetail.textContent, 'HTTP 500 from the model gateway')
+
+  const handle = env.sandbox.__DSH_PET_ASTRA_YAO__
+  handle.acknowledge()
+  await Promise.resolve()
+  assert.equal(bubbleState.textContent, '待机')
+})
+
+test('working/thinking flips do not restart the walk cycle while it is still new', async () => {
+  const { env } = applyWidget()
+  const sprite = env.body.children[0]._shadow.querySelector('.sprite')
+  const handle = env.sandbox.__DSH_PET_ASTRA_YAO__
+  env.pump(0)
+
+  await feed(env, { active: true, sessionId: 's1', state: 'thinking', activity: '', pulse: null, title: null, project: null })
+  env.pump(0)
+  assert.equal(handle.snapshot.baseState, 'thinking')
+  assert.equal(sprite.style.backgroundPosition, '0px -1248px', 'review is row 8')
+
+  // A tool call escalates immediately: working outranks thinking.
+  await feed(env, { active: true, sessionId: 's1', state: 'working', activity: 'shell', pulse: null, title: null, project: null })
+  env.pump(0)
+  assert.equal(handle.snapshot.baseState, 'working')
+  assert.equal(sprite.style.backgroundPosition, '0px -1092px', 'running is row 7')
+
+  // ...and the very next poll flips back to thinking. That must NOT restart.
+  await feed(env, { active: true, sessionId: 's1', state: 'thinking', activity: '', pulse: null, title: null, project: null })
+  env.pump(120)
+  assert.equal(handle.snapshot.baseState, 'working', 'a relaxation waits for the hold window')
+  assert.equal(sprite.style.backgroundPosition, '-144px -1092px', 'the walk cycle keeps advancing instead of restarting')
+
+  // Once the hold window has passed the pending timer drops back to review.
+  env.advanceClock(1600)
+  env.runTimerMatching((timer) => timer.delay === 1500)
+  env.pump(0)
+  assert.equal(handle.snapshot.baseState, 'thinking')
+  assert.equal(sprite.style.backgroundPosition, '0px -1248px')
+})
+
+test('the speed setting scales the frame interval', async () => {
+  const { env } = applyWidget()
+  const sprite = env.body.children[0]._shadow.querySelector('.sprite')
+  const handle = env.sandbox.__DSH_PET_ASTRA_YAO__
+  env.pump(0)
+
+  await handle.patch({ speed: 0.5 })
+  env.pump(160)
+  assert.equal(sprite.style.backgroundPosition, '0px 0px', 'half speed keeps the first frame for 320 ms')
+  env.pump(160)
+  assert.equal(sprite.style.backgroundPosition, '-144px 0px')
+
+  await handle.patch({ speed: 1.6 })
+  env.pump(100)
+  assert.equal(sprite.style.backgroundPosition, '-144px 0px', 'double speed advances after 80 ms')
 })

@@ -11,10 +11,13 @@ export const CONFIG_PATCH_FIELDS = Object.freeze([
   'enabled',
   'scale',
   'opacity',
+  'speed',
   'mirror',
   'locked',
   'hidden',
   'paused',
+  'showBubble',
+  'showBubbleUsage',
   'includeSubagents',
   'posX',
   'posY',
@@ -24,10 +27,13 @@ export const defaults = Object.freeze({
   enabled: true,
   scale: 1,
   opacity: 1,
+  speed: 1,
   mirror: false,
   locked: false,
   hidden: false,
   paused: false,
+  showBubble: true,
+  showBubbleUsage: false,
   includeSubagents: false,
   posX: null,
   posY: null,
@@ -36,6 +42,7 @@ export const defaults = Object.freeze({
 export const LIMITS = Object.freeze({
   scale: Object.freeze({ min: 0.5, max: 2 }),
   opacity: Object.freeze({ min: 0.3, max: 1 }),
+  speed: Object.freeze({ min: 0.5, max: 1.6 }),
 })
 
 export function clampNumber(value, min, max, fallback) {
@@ -71,10 +78,13 @@ export function normalizeConfig(input = {}) {
     enabled: value.enabled !== false,
     scale: clampNumber(value.scale, LIMITS.scale.min, LIMITS.scale.max, defaults.scale),
     opacity: clampNumber(value.opacity, LIMITS.opacity.min, LIMITS.opacity.max, defaults.opacity),
+    speed: clampNumber(value.speed, LIMITS.speed.min, LIMITS.speed.max, defaults.speed),
     mirror: Boolean(value.mirror),
     locked: Boolean(value.locked),
     hidden: Boolean(value.hidden),
     paused: Boolean(value.paused),
+    showBubble: value.showBubble !== false,
+    showBubbleUsage: Boolean(value.showBubbleUsage),
     includeSubagents: Boolean(value.includeSubagents),
     posX: readNullableNumber(value.posX),
     posY: readNullableNumber(value.posY),
@@ -95,6 +105,9 @@ export function applyPatch(current, patch) {
         break
       case 'opacity':
         next.opacity = clampNumber(value, LIMITS.opacity.min, LIMITS.opacity.max, next.opacity)
+        break
+      case 'speed':
+        next.speed = clampNumber(value, LIMITS.speed.min, LIMITS.speed.max, next.speed)
         break
       case 'posX':
       case 'posY':

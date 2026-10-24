@@ -57,7 +57,7 @@ test('the plugin answers over real HTTP', async (t) => {
   const { server, base, routes } = await startServer()
   t.after(() => new Promise((resolve) => server.close(resolve)))
 
-  assert.equal(routes.length, 5)
+  assert.equal(routes.length, 6)
 
   const state = await fetch(`${base}${ENDPOINTS.state}`)
   assert.equal(state.status, 200)
@@ -93,6 +93,14 @@ test('the plugin answers over real HTTP', async (t) => {
 
   const ack = await fetch(`${base}${ENDPOINTS.ack}`, { method: 'POST', body: '{}' })
   assert.equal(ack.status, 200)
+
+  // No credential service is wired in this fixture, so the balance endpoint
+  // answers honestly instead of guessing a number.
+  const balance = await fetch(`${base}${ENDPOINTS.balance}`)
+  assert.equal(balance.status, 200)
+  const balanceBody = await balance.json()
+  assert.equal(balanceBody.ok, false)
+  assert.equal(balanceBody.balance.code, 'NO_SERVICE')
 
   const missing = await fetch(`${base}${ENDPOINTS.state}x`)
   assert.equal(missing.status, 404)

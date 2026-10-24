@@ -18,10 +18,11 @@ import {
 // HTTP doubles
 // ---------------------------------------------------------------------------
 
-function request({ method = 'GET', body, headers = {}, remoteAddress = '127.0.0.1' } = {}) {
+function request({ method = 'GET', body, headers = {}, remoteAddress = '127.0.0.1', url } = {}) {
   const chunks = body === undefined ? [] : [Buffer.from(typeof body === 'string' ? body : JSON.stringify(body))]
   return {
     method,
+    url,
     headers: { host: '127.0.0.1:6575', ...headers },
     socket: { remoteAddress },
     async *[Symbol.asyncIterator]() {
@@ -64,6 +65,7 @@ function createTrackerStub() {
       activity: 'shell',
       waitingKind: '',
       errorKind: '',
+      errorText: '',
       title: null,
       project: 'pet-astra-yao',
       updatedAt: 1,
@@ -275,7 +277,7 @@ test('registerRoutes mounts every endpoint on the web server', () => {
   assert.deepEqual(injected, ['webServer'])
   assert.deepEqual(
     routes.map((route) => route.path).sort(),
-    [ENDPOINTS.ack, ENDPOINTS.config, ENDPOINTS.manifest, ENDPOINTS.spritesheet, ENDPOINTS.state].sort(),
+    [ENDPOINTS.ack, ENDPOINTS.balance, ENDPOINTS.config, ENDPOINTS.manifest, ENDPOINTS.spritesheet, ENDPOINTS.state].sort(),
   )
   assert.ok(routes.every((route) => route.kind === 'exact'))
   assert.ok(routes.every((route) => typeof route.handler === 'function'))
@@ -363,12 +365,51 @@ test('normalizeConfig defaults used by the host are the shipped defaults', () =>
     enabled: true,
     scale: 1,
     opacity: 1,
+    speed: 1,
     mirror: false,
     locked: false,
     hidden: false,
     paused: false,
+    showBubble: true,
+    showBubbleUsage: false,
     includeSubagents: false,
     posX: null,
     posY: null,
   })
+})
+
+test('balance endpoint returns the service payload and refuses non-GET', async () => {
+  const tracker = createTrackerStub()
+  const store = createStore()
+  let forced = null
+  const balance = {
+    async getBalance(options = {}) {
+      forced = Boolean(options.force)
+      return { ok: true, totalBalance: 12.5, currency: 'CNY', todayUsage: 0.35, updatedAt: '2026-10-24T04:00:00.000Z' }
+    },
+  }
+  const handlers = createHandlers({ tracker, store, balance, version: '9.9.9' })
+
+  const res = response()
+  await handlers.serveBalance(request({ url: '/plugins/dsh-pet-astra-yao/balance' }), res)
+  assert.equal(res.statusCode, 200)
+  const body = json(res)
+  assert.equal(body.ok, true)
+  assert.equal(body.balance.totalBalance, 12.5)
+  assert.equal(body.balance.todayUsage, 0.35)
+  assert.equal(body.balance.currency, 'CNY')
+  assert.equal(forced, false)
+
+  const fresh = response()
+  await handlers.serveBalance(request({ url: '/plugins/dsh-pet-astra-yao/balance?refresh=1' }), fresh)
+  assert.equal(forced, true)
+
+  const posted = response()
+  await handlers.serveBalance(request({ method: 'POST' }), posted)
+  assert.equal(posted.statusCode, 405)
+
+  const unavailable = createHandlers({ tracker, store })
+  const none = response()
+  await unavailable.serveBalance(request(), none)
+  assert.equal(json(none).balance.code, 'NO_SERVICE')
 })

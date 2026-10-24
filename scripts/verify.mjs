@@ -22,6 +22,7 @@ import {
   SPRITE_VERSION,
   describeAtlas,
 } from '../src/atlas.js'
+import { CONFIG_PATCH_FIELDS, defaults } from '../src/config.js'
 
 const root = new URL('..', import.meta.url)
 const problems = []
@@ -108,10 +109,14 @@ const patch = await readText('cordis.patch.yml')
 if (!/^-\s+insert:/mu.test(patch)) fail('cordis.patch.yml must contain an "- insert:" list entry')
 if (!/^\s*(?:-\s+)?id:\s*dsh-pet-astra-yao\s*$/mu.test(patch)) fail('cordis.patch.yml must insert a row with id dsh-pet-astra-yao')
 if (!/^\s*(?:-\s+)?name:\s*dsh-pet-astra-yao\s*$/mu.test(patch)) fail('cordis.patch.yml must load the package name dsh-pet-astra-yao')
-for (const field of ['enabled', 'scale', 'opacity']) {
+for (const field of CONFIG_PATCH_FIELDS) {
   if (!new RegExp(`^\\s+${field}:`, 'mu').test(patch)) fail(`cordis.patch.yml config is missing ${field}`)
 }
-ok('cordis.patch.yml: insert row for dsh-pet-astra-yao')
+const patchFields = [...patch.matchAll(/^\s{8}([A-Za-z][\w]*):/gmu)].map((match) => match[1])
+for (const field of patchFields) {
+  if (!Object.hasOwn(defaults, field)) fail(`cordis.patch.yml sets unknown config field ${field}`)
+}
+ok(`cordis.patch.yml: insert row for dsh-pet-astra-yao with ${patchFields.length} config fields`)
 
 // --- built client bundle ----------------------------------------------------
 

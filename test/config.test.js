@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   CONFIG_PATCH_FIELDS,
+  LIMITS,
   applyPatch,
   clampNumber,
   defaults,
@@ -70,4 +71,21 @@ test('applyPatch applies, clamps and coerces fields', () => {
   assert.equal(next.paused, false)
   assert.equal(next.enabled, true)
   assert.equal(defaults.scale, 1, 'applyPatch must not mutate the defaults')
+})
+
+test('speed, showBubble and showBubbleUsage behave like the schema', () => {
+  assert.equal(defaults.speed, 1)
+  assert.equal(defaults.showBubble, true)
+  assert.equal(defaults.showBubbleUsage, false)
+  assert.deepEqual(LIMITS.speed, { min: 0.5, max: 1.6 })
+
+  const normalized = normalizeConfig({ speed: 9, showBubble: 'no', showBubbleUsage: 1 })
+  assert.equal(normalized.speed, 1.6)
+  assert.equal(normalized.showBubble, true, 'only an explicit false hides the bubble')
+  assert.equal(normalized.showBubbleUsage, true)
+
+  const patched = applyPatch(defaults, { speed: 0.4, showBubble: false })
+  assert.equal(patched.speed, 0.5)
+  assert.equal(patched.showBubble, false)
+  assert.equal(defaults.showBubble, true, 'applyPatch must not mutate the defaults')
 })

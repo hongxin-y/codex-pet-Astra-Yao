@@ -11,10 +11,13 @@
         enabled: true
         scale: 1
         opacity: 1
+        speed: 1
         mirror: false
         locked: false
         hidden: false
         paused: false
+        showBubble: true
+        showBubbleUsage: false
         includeSubagents: false
         posX: null
         posY: null

@@ -183,3 +183,32 @@ test('titles come from session/title events', () => {
   assert.equal(tracker.snapshot().title, 'Refactor the pet')
   assert.equal(tracker.snapshot().sessionId, 's1')
 })
+
+test('failed results keep an error text for the bubble', () => {
+  const tracker = createTracker()
+  const s = session()
+
+  tracker.handle(s, event('turn/start'))
+  tracker.handle(s, event('tool/call', { callId: 'c1', name: 'shell' }))
+  tracker.handle(s, event('tool/result', { callId: 'c1', error: { message: 'Command failed: exit 1' } }))
+  assert.equal(tracker.snapshot().pulse.animation, 'failed')
+
+  tracker.handle(s, event('turn/end', { reason: { kind: 'error', message: 'model gateway  500' } }))
+  const snap = tracker.snapshot()
+  assert.equal(snap.state, STATE.ERROR)
+  assert.equal(snap.errorText, 'model gateway 500')
+
+  tracker.acknowledge('s1')
+  assert.equal(tracker.snapshot().errorText, '')
+})
+
+test('error text is trimmed to one line of at most 140 characters', () => {
+  const tracker = createTracker()
+  const s = session()
+
+  tracker.handle(s, event('turn/start'))
+  tracker.handle(s, event('turn/end', { reason: { kind: 'max-tokens', message: '  ' + 'x'.repeat(400) + ' more  ' } }))
+  const text = tracker.snapshot().errorText
+  assert.equal(text.length, 140)
+  assert.equal(text, 'x'.repeat(140))
+})

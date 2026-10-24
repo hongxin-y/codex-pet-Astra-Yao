@@ -4,6 +4,8 @@
 DeepSeek Harness（DSH）可以识别的插件：装进 profile 之后，Astra Yao 会以悬浮小人的形式待在 DSH Web 界面
 右下角，跟着会话状态换动作——思考时翻谱、执行命令时小跑、等你确认时托腮等待、出错时躺平。
 
+头顶还有一个状态气泡：写着当前状态、正在跑的工具、报错原文，可选显示 DeepSeek 账户余额和今日消耗。
+
 - 角色：深墨绿长发、红黑外套、白裙、金色环形麦克风立杖的舞台歌手像素小人
 - 素材：`spritesheet.webp`，1536×2288，Codex v2 atlas（8 列 × 11 行，单帧 192×208），透明背景
 - 形态：一个标准的 DSH 插件包（`package.json` 里的 `dsh.bundle` + `dsh.client`），
@@ -12,7 +14,8 @@ DeepSeek Harness（DSH）可以识别的插件：装进 profile 之后，Astra Y
 > **English:** Astra Yao is a Codex v2 sprite-atlas pet for the DeepSeek Harness web GUI. One 1536×2288
 > atlas (8×11 frames of 192×208) drives nine animations; the server half follows session events, so the pet
 > idles, thinks, runs while tools are working, waits on approvals and lies down on errors. The browser half
-> paints it in a shadow-root widget with 16-direction pointer look, drag-to-move and a right-click size menu.
+> paints it in a shadow-root widget with 16-direction pointer look, drag-to-move, a status bubble and a
+> right-click menu. The bubble can also show the DeepSeek account balance and today's spend.
 > Install with `dsh plugin --profile desktop add <path-to-this-repo>`.
 
 ## 目录
@@ -25,13 +28,14 @@ pet-astra-yao/
 |   |-- index.js          # 服务端插件：会话跟踪、配置、/plugins/dsh-pet-astra-yao/* 接口
 |   |-- state.js          # 会话事件 → 桌宠状态（纯函数，便于测试）
 |   |-- atlas.js          # Codex atlas 契约：行列、帧数、方向、取帧算法
+|   |-- balance.js        # DeepSeek 余额查询 + 今日消耗记账
 |   |-- config.js         # 配置归一化与 PATCH 校验
-|   `-- client.core.js    # 浏览器端源码（影子 DOM、拖拽、右键菜单、轮询）
+|   `-- client.core.js    # 浏览器端源码（影子 DOM、拖拽、气泡、右键菜单、轮询）
 |-- scripts/
 |   |-- build-client.mjs  # 把 client.core.js 打包成 lib/client.js
 |   `-- verify.mjs        # 安装前自检：清单、补丁、bundle、atlas
 |-- lib/client.js         # 构建产物（已提交，DSH 启动时直接加载）
-|-- test/                 # node:test 单测（atlas / state / config / client / host）
+|-- test/                 # node:test 单测（atlas / state / config / balance / client / host / server）
 |-- assets/icon-180.png   # 插件市场图标（从图集待机帧裁出来）
 |-- pet.json              # Codex 宠物清单（保留，Codex 端仍可用）
 |-- spritesheet.webp      # 图集，同时被 DSH 插件以 /assets 接口提供
@@ -85,9 +89,12 @@ pnpm 会拉仓库、跑 `prepare` 重新生成 `lib/client.js`。这样装的是
 | --- | --- |
 | 拖动 | 移动位置（拖动时播放左右跑），松手后坐标存回配置；`locked` 时不可拖 |
 | 单击 | 戳一下：挥手；若当前是报错状态，则点一下即「我知道了」，回到待机 |
-| 右键 | 打开菜单：显示桌宠、大小、不透明度、锁定位置、左右镜像、回右下角、我知道了 |
+| 右键 | 打开菜单：显示桌宠、大小、不透明度、动画速度、锁定位置、左右镜像、状态气泡、显示余额、回右下角、我知道了 |
 | 隐藏后 | 右下角留一个小圆点，点它把桌宠叫回来 |
 | 鼠标移动 | 待机时会看向光标（用图集第 9–10 行的 16 个朝向） |
+
+状态在「思考 ↔ 执行」之间抖动时，动画不会跟着一秒一重启：升级（执行、等待、报错）立刻切换，
+回落要等当前动作播满 1.5 秒，所以小跑会连续跑下去，而不是原地抽动。
 
 ## 状态映射
 
@@ -105,6 +112,21 @@ pnpm 会拉仓库、跑 `prepare` 重新生成 `lib/client.js`。这样装的是
 
 子会话默认被忽略；把 `includeSubagents` 打开后，子代理的活动也会驱动桌宠。
 
+## 状态气泡与余额
+
+桌宠头顶的气泡会写三行：当前状态、细节（正在跑的工具 / 等你确认的类型 / 报错原文）、当前会话的项目和标题。
+空闲超过 10 秒自动收起，有新动作再出现；右键菜单里的「状态气泡」可以关掉它。
+
+「显示余额」打开后，第三行换成 DeepSeek 账户余额和今日消耗：
+
+- 服务端通过 DSH 的 `credentials` 服务取 `DEEPSEEK_API_KEY`，请求 `https://api.deepseek.com/user/balance`，
+  60 秒缓存，浏览器端每 60 秒最多拉一次（`GET /balance?refresh=1` 可以强制刷新）。
+- 今日消耗按「余额下降」累计，账本存在 `%USERPROFILE%\.dsh\.dsh-pet-astra-yao-usage.json`，跨天自动归零；
+  充值导致余额上升时不会记成负消耗。
+- 没配置 Key、或者当前 DSH 没有暴露 `credentials` 服务时，气泡显示「余额不可用：未配置 API Key」，
+  桌宠其它功能不受影响。
+- 余额只从你的机器直连 DeepSeek，不经过 DSH 的服务器；接口本身也只接受本机回环请求。
+
 ## 配置
 
 配置存在 profile 的 `cordis.patch.yml`（也就是插件页表单背后的那份），字段如下：
@@ -114,10 +136,13 @@ pnpm 会拉仓库、跑 `prepare` 重新生成 `lib/client.js`。这样装的是
 | `enabled` | `true` | 是否启用这个插件 |
 | `scale` | `1` | 缩放，0.5–2 |
 | `opacity` | `1` | 不透明度，0.3–1 |
+| `speed` | `1` | 动画速度，0.5–1.6（0.5 最慢，1.6 最快） |
 | `mirror` | `false` | 左右镜像 |
 | `locked` | `false` | 锁定位置，禁止拖动 |
 | `hidden` | `false` | 隐藏（留一个小圆点） |
 | `paused` | `false` | 暂停逐帧动画，只画当前帧 |
+| `showBubble` | `true` | 显示头顶状态气泡 |
+| `showBubbleUsage` | `false` | 气泡里显示余额和今日消耗 |
 | `includeSubagents` | `false` | 子代理是否也驱动桌宠 |
 | `posX` / `posY` | `null` | 上次拖到的位置，`null` 表示贴右下角 |
 
@@ -132,6 +157,7 @@ pnpm 会拉仓库、跑 `prepare` 重新生成 `lib/client.js`。这样装的是
 | `GET` | `/state` | 一次快照：插件版本、配置、图集描述、当前会话状态 |
 | `GET` `PATCH` `POST` | `/config` | 读配置 / 合并式改配置（未知字段 400） |
 | `POST` | `/ack` | 清掉报错状态（桌宠「我知道了」） |
+| `GET` | `/balance` | 余额 + 今日消耗（`?refresh=1` 跳过 60 秒缓存） |
 | `GET` | `/spritesheet` | 图集本体，`image/webp` |
 | `GET` | `/manifest` | `pet.json` |
 
@@ -145,7 +171,7 @@ pnpm 会拉仓库、跑 `prepare` 重新生成 `lib/client.js`。这样装的是
 ```powershell
 npm run build     # 改完 src/client.core.js 后重新生成 lib/client.js
 npm run verify    # 自检：清单字段、补丁行、bundle、图集尺寸（1536×2288 / v2）
-npm test          # node:test：atlas / config / state / client / host / server 共 41 个用例
+npm test          # node:test：atlas / config / state / balance / client / host / server 共 57 个用例
 ```
 
 `lib/client.js` 是提交进仓库的构建产物：DSH 启动时直接读它，不会帮你编译，所以改完源码记得 `npm run build`

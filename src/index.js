@@ -20,6 +20,7 @@ import { readFile } from 'node:fs/promises'
 import { readFileSync } from 'node:fs'
 import { localHostOk } from './local-access.js'
 import { createTracker } from './state.js'
+import { createBalanceService } from './balance.js'
 import { SPRITE_VERSION, describeAtlas } from './atlas.js'
 import { CONFIG_PATCH_FIELDS, applyPatch, defaults, normalizeConfig, readConfig } from './config.js'
 
@@ -46,6 +47,7 @@ export const ENDPOINTS = Object.freeze({
   state: `${API_PREFIX}/state`,
   config: `${API_PREFIX}/config`,
   ack: `${API_PREFIX}/ack`,
+  balance: `${API_PREFIX}/balance`,
   spritesheet: `${API_PREFIX}/assets/spritesheet.webp`,
   manifest: `${API_PREFIX}/assets/pet.json`,
 })
@@ -57,10 +59,13 @@ export const Config = Schema && Schema.object({
   enabled: Schema.boolean().default(true).description('Show the Astra Yao pet in the DSH web UI').volatile(),
   scale: Schema.number().min(0.5).max(2).step(0.05).default(1).role('slider').description('Pet size multiplier').volatile(),
   opacity: Schema.number().min(0.3).max(1).step(0.05).default(1).role('slider').description('Pet opacity').volatile(),
+  speed: Schema.number().min(0.5).max(1.6).step(0.05).default(1).role('slider').description('Animation speed multiplier (lower is calmer)').volatile(),
   mirror: Schema.boolean().default(false).description('Mirror the sprite horizontally').volatile(),
   locked: Schema.boolean().default(false).description('Lock the pet position and disable dragging').volatile(),
   hidden: Schema.boolean().default(false).description('Hide the pet without disabling the plugin').volatile(),
   paused: Schema.boolean().default(false).description('Pause the frame animation').volatile(),
+  showBubble: Schema.boolean().default(true).description('Show the status bubble above the pet').volatile(),
+  showBubbleUsage: Schema.boolean().default(false).description('Show the DeepSeek balance in the bubble').volatile(),
   includeSubagents: Schema.boolean().default(false).description('Let subagent sessions drive the pet state').volatile(),
   posX: Schema.number().default(null).description('Saved horizontal position in CSS pixels (null = default corner)').volatile(),
   posY: Schema.number().default(null).description('Saved vertical position in CSS pixels (null = default corner)').volatile(),
@@ -101,8 +106,9 @@ async function readJsonBody(req, limit = 8192) {
  * @param {ReturnType<typeof createTracker>} deps.tracker
  * @param {{ get: () => object, patch: (patch: object) => object }} deps.store
  * @param {{ spritesheet?: string | URL, manifest?: string | URL }} [deps.assets]
+ * @param {ReturnType<typeof createBalanceService>} [deps.balance]
  */
-export function createHandlers({ tracker, store, assets = {}, version = VERSION }) {
+export function createHandlers({ tracker, store, assets = {}, version = VERSION, balance = null }) {
   const spriteFile = assets.spritesheet ?? new URL('../spritesheet.webp', import.meta.url)
   const manifestFile = assets.manifest ?? new URL('../pet.json', import.meta.url)
   const fileCache = new Map()
@@ -168,6 +174,20 @@ export function createHandlers({ tracker, store, assets = {}, version = VERSION 
     jsonResponse(res, 200, { ok: true, session: tracker.snapshot() })
   }
 
+  async function serveBalance(req, res) {
+    if (String(req?.method ?? 'GET').toUpperCase() !== 'GET') {
+      jsonResponse(res, 405, { ok: false, error: 'use GET' })
+      return
+    }
+    if (!balance) {
+      jsonResponse(res, 200, { ok: false, balance: { ok: false, code: 'NO_SERVICE', error: '余额服务不可用' } })
+      return
+    }
+    const force = /[?&](?:refresh|force)=1(?:&|$)/u.test(String(req?.url ?? ''))
+    const payload = await balance.getBalance({ force })
+    jsonResponse(res, 200, { ok: payload.ok === true, balance: payload, serverTime: Date.now() })
+  }
+
   async function serveSpritesheet(_req, res) {
     const data = await readAsset(spriteFile)
     res.writeHead(200, {
@@ -188,7 +208,7 @@ export function createHandlers({ tracker, store, assets = {}, version = VERSION 
     res.end(data)
   }
 
-  return { serveState, serveConfig, serveAck, serveSpritesheet, serveManifest }
+  return { serveState, serveConfig, serveAck, serveBalance, serveSpritesheet, serveManifest }
 }
 
 /** Wrap a handler with the loopback guard and a JSON error fallback. */
@@ -224,6 +244,7 @@ export function registerRoutes(ctx, deps) {
       ['state', ENDPOINTS.state, handlers.serveState],
       ['config', ENDPOINTS.config, handlers.serveConfig],
       ['ack', ENDPOINTS.ack, handlers.serveAck],
+      ['balance', ENDPOINTS.balance, handlers.serveBalance],
       ['spritesheet', ENDPOINTS.spritesheet, handlers.serveSpritesheet],
       ['manifest', ENDPOINTS.manifest, handlers.serveManifest],
     ]
@@ -313,9 +334,25 @@ export function mount(ctx, config = {}) {
     }, 'dsh-pet-astra-yao: session events')
   }
 
-  const handlers = createHandlers({ tracker, store })
+  const credentialsService =
+    (typeof ctx.get === 'function' ? ctx.get('credentials') : undefined) ?? ctx.credentials
+  const balance = createBalanceService({
+    resolveCredential:
+      credentialsService && typeof credentialsService.resolve === 'function'
+        ? (credentialName) => {
+            try {
+              return credentialsService.resolve(credentialName)
+            } catch (error) {
+              return Promise.reject(error)
+            }
+          }
+        : undefined,
+    log: (message) => ctx.logger?.warn?.(`dsh-pet-astra-yao: ${message}`),
+  })
+
+  const handlers = createHandlers({ tracker, store, balance })
   registerRoutes(ctx, { handlers })
-  return { tracker, store, handlers }
+  return { tracker, store, handlers, balance }
 }
 
 /** Cordis plugin entry. */

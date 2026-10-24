@@ -72,6 +72,13 @@ function turnEndKind(event) {
   return String(event?.data?.reason?.kind ?? 'completed')
 }
 
+/** Short human-readable text for a failed tool result or a failed turn. */
+export function errorTextOf(value) {
+  const raw = typeof value === 'string' ? value : value?.message ?? value?.error ?? value?.text ?? ''
+  const text = String(raw ?? '').replace(/\s+/gu, ' ').trim()
+  return text ? text.slice(0, 140) : undefined
+}
+
 /**
  * @param {object} [options]
  * @param {boolean} [options.includeSubagents] let subagent sessions drive the pet
@@ -102,6 +109,7 @@ export function createTracker(options = {}) {
         state: STATE.IDLE,
         activity: '',
         errorKind: '',
+        errorText: '',
         turnActive: false,
         openTools: new Map(),
         waits: new Map(),
@@ -120,6 +128,7 @@ export function createTracker(options = {}) {
     record.state = state
     record.activity = extra.activity ?? ''
     record.errorKind = extra.errorKind ?? ''
+    record.errorText = extra.errorText ?? ''
     record.updatedAt = config.now()
     const after = `${record.state}\u0000${record.activity}\u0000${record.errorKind}`
     return before !== after
@@ -200,7 +209,10 @@ export function createTracker(options = {}) {
           record.waits.delete(callId)
         }
         let changed = settle(record)
-        if (event?.data?.error) changed = firePulse(STATE.ERROR, 'failed', config.errorPulseMs) || changed
+        if (event?.data?.error) {
+          record.errorText = errorTextOf(event.data.error) ?? record.errorText
+          changed = firePulse(STATE.ERROR, 'failed', config.errorPulseMs) || changed
+        }
         return changed
       }
 
@@ -226,7 +238,10 @@ export function createTracker(options = {}) {
         }
         if (kind === 'aborted' || kind === 'disposed') return update(record, STATE.IDLE)
         if (kind === 'blocked') return update(record, STATE.WAITING)
-        return update(record, STATE.ERROR, { errorKind: kind })
+        return update(record, STATE.ERROR, {
+          errorKind: kind,
+          errorText: errorTextOf(event?.data?.reason) ?? errorTextOf(event?.data?.error) ?? '',
+        })
       }
 
       default:
@@ -284,6 +299,7 @@ export function createTracker(options = {}) {
       activity: active?.activity ?? '',
       waitingKind: active ? waitingKindOf(active) : '',
       errorKind: active?.errorKind ?? '',
+      errorText: active?.state === STATE.ERROR ? active.errorText ?? '' : '',
       title: active?.title ?? null,
       project: active?.project ?? null,
       updatedAt: active?.updatedAt ?? 0,
