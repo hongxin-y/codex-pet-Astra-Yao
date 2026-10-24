@@ -424,12 +424,12 @@ test('teardown removes the widget and unregisters the debug handle', () => {
 // Session state: bubble text and the anti-flicker base pose
 // ---------------------------------------------------------------------------
 
-function sessionPayload(session) {
-  return { ok: true, config: {}, session, serverTime: 1 }
+function sessionPayload(session, config = {}) {
+  return { ok: true, config, session, serverTime: 1 }
 }
 
-function feed(env, session) {
-  env.sandbox.fetch = async () => ({ ok: true, status: 200, json: async () => sessionPayload(session) })
+function feed(env, session, config = {}) {
+  env.sandbox.fetch = async () => ({ ok: true, status: 200, json: async () => sessionPayload(session, config) })
   return env.runTimer()
 }
 
@@ -633,11 +633,20 @@ test('thinking holds the hand-on-chin pose instead of nodding through six frames
   assert.equal(sprite.style.backgroundPosition, '-288px -1248px', 'and back to pondering')
 })
 
-test('pointer look only engages near the pet, so a far cursor leaves idle animating', () => {
+test('pointer look is opt-in: rows 9-10 are drawn at a different scale', async () => {
   const { env } = applyWidget()
   const sprite = env.body.children[0]._shadow.querySelector('.sprite')
+  const session = { active: true, sessionId: 's1', state: 'idle', activity: '', pulse: null, title: null, project: null }
+  await feed(env, session)
   env.pump(0)
-  // The fake element reports a 144x156 box at the origin, so its centre is (72, 78).
+
+  // Default config keeps lookAtPointer off, so a nearby cursor changes nothing.
+  env.fireWindow('pointermove', { clientX: 72 + 100, clientY: 78 })
+  env.pump(0)
+  assert.match(sprite.style.backgroundPosition, / 0px$/u, 'the idle row keeps playing by default')
+
+  // Turning it on brings the look cells back, still limited to a 280 px radius.
+  await feed(env, session, { lookAtPointer: true })
   env.fireWindow('pointermove', { clientX: 72 + 400, clientY: 78 })
   env.pump(200)
   assert.equal(sprite.style.backgroundPosition, '-144px 0px', 'idle keeps animating when the cursor is far')

@@ -58,7 +58,7 @@ const DEFAULT_CONFIG = Object.freeze({
   paused: false,
   showBubble: true,
   showBubbleUsage: false,
-  lookAtPointer: true,
+  lookAtPointer: false,
   posX: null,
   posY: null,
 })
@@ -805,7 +805,7 @@ function syncMenu() {
   menuEl.querySelector('[data-field="hidden"]').checked = !cfg.hidden
   menuEl.querySelector('[data-field="locked"]').checked = Boolean(cfg.locked)
   menuEl.querySelector('[data-field="mirror"]').checked = Boolean(cfg.mirror)
-  menuEl.querySelector('[data-field="lookAtPointer"]').checked = cfg.lookAtPointer !== false
+  menuEl.querySelector('[data-field="lookAtPointer"]').checked = cfg.lookAtPointer === true
   menuEl.querySelector('[data-field="showBubble"]').checked = cfg.showBubble !== false
   menuEl.querySelector('[data-field="showBubbleUsage"]').checked = Boolean(cfg.showBubbleUsage)
   menuEl.querySelector('[data-field="scale"]').value = String(cfg.scale)
@@ -1012,7 +1012,7 @@ function poke() {
 }
 
 function updateLook(event) {
-  if (!petEl || cfg.hidden || cfg.paused || cfg.lookAtPointer === false) {
+  if (!petEl || cfg.hidden || cfg.paused || cfg.lookAtPointer !== true) {
     lookCell = null
     return
   }

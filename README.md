@@ -14,8 +14,8 @@ DeepSeek Harness（DSH）可以识别的插件：装进 profile 之后，Astra Y
 > **English:** Astra Yao is a Codex v2 sprite-atlas pet for the DeepSeek Harness web GUI. One 1536×2288
 > atlas (8×11 frames of 192×208) drives nine animations; the server half follows session events, so the pet
 > idles, thinks, runs while tools are working, waits on approvals and lies down on errors. The browser half
-> paints it in a shadow-root widget with 16-direction pointer look, drag-to-move, a status bubble and a
-> right-click menu. The bubble can also show the DeepSeek account balance and today's spend.
+> paints it in a shadow-root widget with drag-to-move, a status bubble, a right-click menu and an optional
+> pointer-look mode. The bubble can also show the DeepSeek account balance and today's spend.
 > Install with `dsh plugin --profile desktop add <path-to-this-repo>`.
 
 ## 目录
@@ -91,7 +91,7 @@ pnpm 会拉仓库、跑 `prepare` 重新生成 `lib/client.js`。这样装的是
 | 单击 | 戳一下：挥手；若当前是报错状态，则点一下即「我知道了」，回到待机 |
 | 右键 | 打开菜单：显示桌宠、大小、不透明度、动画速度、锁定位置、左右镜像、跟随光标、状态气泡、显示余额、回右下角、我知道了 |
 | 隐藏后 | 右下角留一个小圆点，点它把桌宠叫回来 |
-| 鼠标移动 | 待机时、且光标距离桌宠 280 px 以内，才看向光标（图集第 9–10 行的 16 个朝向）；离得远就继续播放待机动画 |
+| 鼠标移动 | 默认关闭（见 `lookAtPointer`）。打开后：待机时、且光标距离桌宠 280 px 以内，才看向光标（图集第 9–10 行的 16 个朝向） |
 
 状态在「思考 ↔ 执行」之间抖动时，动画不会跟着一秒一重启：升级（执行、等待、报错）立刻切换，
 回落要等当前动作播满 1.5 秒，所以小跑会连续跑下去，而不是原地抽动。
@@ -140,7 +140,7 @@ pnpm 会拉仓库、跑 `prepare` 重新生成 `lib/client.js`。这样装的是
 | `opacity` | `1` | 不透明度，0.3–1 |
 | `speed` | `1` | 动画速度，0.5–1.6（0.5 最慢，1.6 最快） |
 | `mirror` | `false` | 左右镜像 |
-| `lookAtPointer` | `true` | 光标靠近时看向光标（关闭后只播待机动画） |
+| `lookAtPointer` | `false` | 光标靠近时看向光标；默认关闭，因为第 9–10 行是另一套比例（见下方素材说明） |
 | `locked` | `false` | 锁定位置，禁止拖动 |
 | `hidden` | `false` | 隐藏（留一个小圆点） |
 | `paused` | `false` | 暂停逐帧动画，只画当前帧 |
@@ -193,10 +193,11 @@ npm test          # node:test：atlas / config / state / balance / client / host
 像素美术与角色形象来自原仓库，角色「Astra Yao（耀嘉音）」及相关设定的权利归原权利人所有；
 本仓库只做桌宠资源的整理与 DSH 插件化，未附带额外许可证。
 
-图集是生成式工具产出的，有三处与标准 Codex 图集不一致，插件里做了规避（见 `src/atlas.js`）：
+图集是生成式工具产出的，有几处与标准 Codex 图集不一致，插件里做了规避（见 `src/atlas.js`）：
 
 | 位置 | 问题 | 处理 |
 | --- | --- | --- |
 | 第 1 行（向右跑） | 第 2、3、6 帧是跪姿，比其他帧矮约 12%，循环播放像在「忽大忽小」 | 不用这一行，改用干净的第 2 行（向左跑）水平镜像，`flip: true` |
 | 第 5 行第 5 帧（failed） | 唯一一帧躺平姿势，混在 8 帧循环里会让桌宠每秒趴下一次 | `columns: [0,1,2,3,4,6,7]`，跳过该帧 |
 | 第 8 行（review，思考） | 六帧里最后两帧是低头闭眼的「点头」，按 150 ms 循环等于每秒点一次头 | 只取托腮的第 2 帧和闭眼第 3 帧，`columns: [2,3,2]`、`interval: 620`，变成慢慢眨眼 |
+| 第 9–10 行（16 朝向） | 这一套是单独画的：头明显更大、身体更短（实测角色高 194 px 对第 0 行的 187 px，头身比不同），侧脸还被压窄到 97–124 px | `lookAtPointer` 默认关闭，待机只用第 0 行；想开着看向光标也能在菜单里打开 |
