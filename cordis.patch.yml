@@ -1,0 +1,20 @@
+# dsh-pet-astra-yao bundle patch.
+#
+# Installed by the DSH plugin manager (or `dsh plugin add`), this row adds the
+# pet to the profile's plugin tree. The `id` is the config namespace shown on
+# the Plugins page; changing it orphans any saved configuration in the
+# profile's own cordis.patch.yml.
+- insert:
+    - id: dsh-pet-astra-yao
+      name: dsh-pet-astra-yao
+      config:
+        enabled: true
+        scale: 1
+        opacity: 1
+        mirror: false
+        locked: false
+        hidden: false
+        paused: false
+        includeSubagents: false
+        posX: null
+        posY: null

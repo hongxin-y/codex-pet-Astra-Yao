@@ -1,0 +1,390 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import vm from 'node:vm'
+import { describeAtlas } from '../src/atlas.js'
+
+const BUNDLE = readFileSync(new URL('../lib/client.js', import.meta.url), 'utf8')
+const BUNDLE_ID = 'dsh-pet-astra-yao'
+const ROOT_ID = 'dsh-pet-astra-yao-root'
+
+// ---------------------------------------------------------------------------
+// A fake DOM just large enough to run the widget: elements are plain objects,
+// the shadow root resolves a fixed set of selectors, and timers/rAF are manual
+// so the test never waits on wall-clock time.
+// ---------------------------------------------------------------------------
+
+function fakeElement(tagName) {
+  const element = {
+    tagName: String(tagName).toUpperCase(),
+    style: {},
+    dataset: {},
+    hidden: false,
+    children: [],
+    classList: { add() {}, remove() {} },
+    listeners: new Map(),
+    parentNode: null,
+    _box: { left: 0, top: 0, width: 144, height: 156 },
+    addEventListener(type, handler) {
+      const list = element.listeners.get(type) ?? []
+      list.push(handler)
+      element.listeners.set(type, list)
+    },
+    removeEventListener(type, handler) {
+      const list = element.listeners.get(type) ?? []
+      element.listeners.set(
+        type,
+        list.filter((item) => item !== handler),
+      )
+    },
+    dispatch(type, event = {}) {
+      for (const handler of element.listeners.get(type) ?? []) handler(event)
+    },
+    getBoundingClientRect() {
+      return { ...element._box }
+    },
+    setPointerCapture() {},
+    releasePointerCapture() {},
+    attachShadow() {
+      element._shadow = fakeShadow()
+      return element._shadow
+    },
+    appendChild(child) {
+      child.parentNode = element
+      element.children.push(child)
+      return child
+    },
+    removeChild(child) {
+      element.children = element.children.filter((item) => item !== child)
+      child.parentNode = null
+      return child
+    },
+  }
+  Object.defineProperty(element, 'innerHTML', {
+    set(value) {
+      element._html = value
+    },
+    get() {
+      return element._html
+    },
+  })
+  return element
+}
+
+const SHADOW_SELECTORS = ['.pet', '.sprite', '.ghost', '.menu', '.menu-state']
+
+function fakeShadow() {
+  const cache = new Map()
+  return {
+    set innerHTML(value) {
+      this._html = value
+    },
+    get innerHTML() {
+      return this._html
+    },
+    querySelector(selector) {
+      const key = selector.split(' ').pop()
+      if (!cache.has(key)) cache.set(key, fakeElement('div'))
+      return cache.get(key)
+    },
+    querySelectorAll() {
+      return []
+    },
+  }
+}
+
+function createSandbox() {
+  const registry = new Map()
+  const body = fakeElement('body')
+  const originalAppend = body.appendChild.bind(body)
+  body.appendChild = (child) => {
+    originalAppend(child)
+    if (child.id) registry.set(child.id, child)
+    return child
+  }
+
+  const documentListeners = new Map()
+  const document = {
+    body,
+    hidden: false,
+    getElementById(id) {
+      return registry.get(id) ?? null
+    },
+    createElement(tag) {
+      return fakeElement(tag)
+    },
+    querySelectorAll() {
+      return []
+    },
+    addEventListener(type, handler) {
+      const list = documentListeners.get(type) ?? []
+      list.push(handler)
+      documentListeners.set(type, list)
+    },
+    removeEventListener(type, handler) {
+      documentListeners.set(
+        type,
+        (documentListeners.get(type) ?? []).filter((item) => item !== handler),
+      )
+    },
+  }
+
+  const windowListeners = new Map()
+  const window = {
+    innerWidth: 1280,
+    innerHeight: 800,
+    addEventListener(type, handler) {
+      const list = windowListeners.get(type) ?? []
+      list.push(handler)
+      windowListeners.set(type, list)
+    },
+    removeEventListener(type, handler) {
+      windowListeners.set(
+        type,
+        (windowListeners.get(type) ?? []).filter((item) => item !== handler),
+      )
+    },
+  }
+
+  let clock = 1000
+  const rafs = []
+  const timers = new Map()
+  let timerSeq = 0
+  let capture = null
+  const patches = []
+
+  const sandbox = {
+    console,
+    document,
+    window,
+    performance: {
+      now: () => clock,
+      getEntriesByType: () => [{ name: 'http://127.0.0.1:6575/plugins/??dsh-pet-astra-yao&rev=1' }],
+    },
+    requestAnimationFrame(callback) {
+      rafs.push(callback)
+      return rafs.length
+    },
+    cancelAnimationFrame() {},
+    setTimeout(callback, delay) {
+      timerSeq += 1
+      timers.set(timerSeq, { callback, delay })
+      return timerSeq
+    },
+    clearTimeout(id) {
+      timers.delete(id)
+    },
+    fetch: async (url, init = {}) => {
+      if (String(url).endsWith('/config') && init.method === 'PATCH') {
+        patches.push(JSON.parse(init.body))
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ ok: true, config: {}, session: null }),
+      }
+    },
+    __ModuleLoader__: {
+      load(entry) {
+        capture = entry
+      },
+    },
+  }
+  sandbox.window.__ModuleLoader__ = sandbox.__ModuleLoader__
+  sandbox.globalThis = sandbox
+
+  return {
+    sandbox,
+    body,
+    patches,
+    timers,
+    rafs,
+    advanceClock(ms) {
+      clock += ms
+    },
+    now: () => clock,
+    /** Run the most recently scheduled animation frame. */
+    pump(ms = 0) {
+      clock += ms
+      const callback = rafs.pop()
+      assert.ok(callback, 'an animation frame must be scheduled')
+      callback(clock)
+    },
+    /** Run the most recently scheduled timer callback. */
+    runTimer() {
+      const [id, timer] = [...timers.entries()].pop() ?? []
+      assert.ok(timer, 'a timer must be scheduled')
+      timers.delete(id)
+      return timer.callback()
+    },
+    load() {
+      assert.ok(capture, 'the bundle must call window.__ModuleLoader__.load')
+      return capture
+    },
+  }
+}
+
+function loadBundle() {
+  const env = createSandbox()
+  const context = vm.createContext(env.sandbox)
+  vm.runInContext(BUNDLE, context, { filename: 'lib/client.js' })
+  return { env, context }
+}
+
+function makeContextHandle(env) {
+  const effects = []
+  return {
+    effects,
+    effect(factory, label) {
+      effects.push({ factory, label })
+      return () => {}
+    },
+  }
+}
+
+function applyWidget() {
+  const { env, context } = loadBundle()
+  const entry = env.load()
+  assert.equal(entry.id, BUNDLE_ID)
+  const plugin = entry.factory((name) => {
+    throw new Error(`the client bundle must not require modules, got ${JSON.stringify(name)}`)
+  })
+  const ctx = makeContextHandle(env)
+  plugin.apply(ctx)
+  return { env, context, plugin, ctx }
+}
+
+// ---------------------------------------------------------------------------
+// Bundle contract
+// ---------------------------------------------------------------------------
+
+test('bundle registers the DSH client module for this package', () => {
+  const { env } = loadBundle()
+  const entry = env.load()
+  assert.equal(entry.id, BUNDLE_ID)
+  assert.equal(typeof entry.factory, 'function')
+})
+
+test('factory exports the client plugin contract', () => {
+  const { env } = loadBundle()
+  const plugin = env.load().factory(() => {
+    throw new Error('no requires expected')
+  })
+  assert.equal(plugin.name, `${BUNDLE_ID}-client`)
+  assert.ok(Array.isArray(plugin.inject))
+  assert.deepEqual([...plugin.inject], [])
+  assert.equal(typeof plugin.apply, 'function')
+})
+
+test('bundle embeds the shared atlas and the package version', () => {
+  const match = BUNDLE.match(/const PET_ATLAS = (\{.*?\});\n/u)
+  assert.ok(match, 'the bundle must inline the atlas')
+  assert.deepEqual(JSON.parse(match[1]), describeAtlas())
+  assert.match(BUNDLE, /const PET_VERSION = "\d+\.\d+\.\d+[^"]*";/u)
+})
+
+// ---------------------------------------------------------------------------
+// Widget behaviour
+// ---------------------------------------------------------------------------
+
+test('apply mounts the pet and paints the first idle frame', () => {
+  const { env } = applyWidget()
+  assert.equal(env.body.children.length, 1)
+  const host = env.body.children[0]
+  assert.equal(host.id, ROOT_ID)
+
+  const shadow = host._shadow
+  const sprite = shadow.querySelector('.sprite')
+  assert.match(sprite.style.backgroundImage, /\/plugins\/dsh-pet-astra-yao\/assets\/spritesheet\.webp/u)
+
+  env.pump(0)
+  assert.equal(sprite.style.width, '144px')
+  assert.equal(sprite.style.height, '156px')
+  assert.equal(sprite.style.backgroundSize, '1152px 1716px')
+  assert.equal(sprite.style.backgroundPosition, '0px 0px')
+
+  const pet = shadow.querySelector('.pet')
+  assert.equal(pet.style.display, 'block')
+  assert.equal(pet.style.left, '1112px') // 1280 - 144 - 24
+  assert.equal(pet.style.top, '620px') // 800 - 156 - 24
+  assert.match(pet.title, /Astra Yao/u)
+})
+
+test('the animation loop advances columns and wraps', () => {
+  const { env } = applyWidget()
+  const sprite = env.body.children[0]._shadow.querySelector('.sprite')
+
+  env.pump(160)
+  assert.equal(sprite.style.backgroundPosition, '-144px 0px')
+  env.pump(160 * 4)
+  assert.equal(sprite.style.backgroundPosition, '-720px 0px')
+  env.pump(160)
+  assert.equal(sprite.style.backgroundPosition, '0px 0px', 'six-frame idle loops back to column 0')
+})
+
+test('config patches repaint scale, opacity, mirror and visibility', async () => {
+  const { env, context } = applyWidget()
+  const host = env.body.children[0]
+  const sprite = host._shadow.querySelector('.sprite')
+  const pet = host._shadow.querySelector('.pet')
+  const ghost = host._shadow.querySelector('.ghost')
+  const handle = env.sandbox.__DSH_PET_ASTRA_YAO__
+  assert.ok(handle, 'the widget exposes a debug handle')
+
+  handle.patch({ scale: 1.5, opacity: 0.6, mirror: true })
+  await Promise.resolve()
+  assert.equal(pet.style.opacity, '0.6')
+  assert.equal(sprite.style.transform, 'scaleX(-1)')
+
+  env.pump(0)
+  assert.equal(sprite.style.width, '216px')
+  assert.equal(sprite.style.height, '234px')
+  assert.equal(sprite.style.backgroundSize, '1728px 2574px')
+
+  handle.patch({ hidden: true })
+  await Promise.resolve()
+  assert.equal(pet.style.display, 'none')
+  assert.equal(ghost.hidden, false)
+
+  handle.patch({ hidden: false })
+  await Promise.resolve()
+  assert.equal(pet.style.display, 'block')
+  assert.equal(ghost.hidden, true)
+
+  assert.deepEqual(env.patches, [
+    { scale: 1.5, opacity: 0.6, mirror: true },
+    { hidden: true },
+    { hidden: false },
+  ])
+  void context
+})
+
+test('pausing freezes the sprite on the first frame', async () => {
+  const { env } = applyWidget()
+  const sprite = env.body.children[0]._shadow.querySelector('.sprite')
+  const handle = env.sandbox.__DSH_PET_ASTRA_YAO__
+  env.pump(160)
+  assert.equal(sprite.style.backgroundPosition, '-144px 0px')
+  handle.patch({ paused: true })
+  await Promise.resolve()
+  env.pump(160)
+  assert.equal(sprite.style.backgroundPosition, '0px 0px')
+})
+
+test('polling is scheduled and survives a failing fetch', async () => {
+  const { env } = applyWidget()
+  assert.ok(env.timers.size > 0, 'the first poll must be scheduled')
+  env.sandbox.fetch = async () => {
+    throw new Error('offline')
+  }
+  await env.runTimer()
+  assert.ok([...env.timers.values()].some((timer) => timer.delay === 4000), 'a failed poll retries slowly')
+})
+
+test('teardown removes the widget and unregisters the debug handle', () => {
+  const { env } = applyWidget()
+  const handle = env.sandbox.__DSH_PET_ASTRA_YAO__
+  handle.teardown()
+  assert.equal(env.body.children.length, 0)
+  assert.equal(env.sandbox.__DSH_PET_ASTRA_YAO__, undefined)
+})

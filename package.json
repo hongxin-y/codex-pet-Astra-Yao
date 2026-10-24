@@ -1,0 +1,60 @@
+{
+  "name": "dsh-pet-astra-yao",
+  "version": "0.1.0",
+  "description": "Astra Yao — a Codex-style desktop pet for DeepSeek Harness, rendered from the Codex v2 spritesheet atlas",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./client": "./lib/client.js",
+    "./atlas": "./src/atlas.js",
+    "./config": "./src/config.js",
+    "./state": "./src/state.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src/",
+    "lib/client.js",
+    "spritesheet.webp",
+    "pet.json",
+    "cordis.patch.yml",
+    "README.md",
+    "USAGE.md"
+  ],
+  "scripts": {
+    "build": "node scripts/build-client.mjs",
+    "verify": "node scripts/verify.mjs",
+    "test": "node --test test/",
+    "prepare": "node scripts/build-client.mjs"
+  },
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "desktop-pet",
+    "codex-pet",
+    "astra-yao"
+  ],
+  "engines": {
+    "node": ">=22.19"
+  },
+  "dependencies": {
+    "@deepseek-ai/schemastery": "^3.18.4"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/cordis": {
+      "optional": true
+    }
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [],
+      "platform": "web"
+    }
+  }
+}

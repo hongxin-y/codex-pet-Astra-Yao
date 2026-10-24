@@ -1,47 +1,149 @@
-# Codex Pet: Astra Yao
+# Astra Yao · DSH 桌宠插件
 
-Astra Yao is a custom Codex Desktop pet package. It includes the pet manifest, animated spritesheet, and setup notes needed to install the pet locally or share it with another Codex user.
+把 [Codex Pet: Astra Yao](https://github.com/hongxin-y/codex-pet-Astra-Yao) 的像素桌宠做成了
+DeepSeek Harness（DSH）可以识别的插件：装进 profile 之后，Astra Yao 会以悬浮小人的形式待在 DSH Web 界面
+右下角，跟着会话状态换动作——思考时翻谱、执行命令时小跑、等你确认时托腮等待、出错时躺平。
 
-The character is a compact stage-singer style desktop companion with dark teal long hair, a red-black jacket, a white dress, and a tall gold ring microphone staff.
+- 角色：深墨绿长发、红黑外套、白裙、金色环形麦克风立杖的舞台歌手像素小人
+- 素材：`spritesheet.webp`，1536×2288，Codex v2 atlas（8 列 × 11 行，单帧 192×208），透明背景
+- 形态：一个标准的 DSH 插件包（`package.json` 里的 `dsh.bundle` + `dsh.client`），
+  服务端一半负责会话状态与 HTTP 接口，浏览器一半负责把 sprite 画到页面上
 
-## Files
+## 目录
 
 ```text
-codex-pet-Astra-Yao/
-|-- pet.json
-|-- spritesheet.webp
-|-- README.md
-`-- USAGE.md
+pet-astra-yao/
+|-- package.json          # DSH 插件清单：dsh.bundle / dsh.client / exports
+|-- cordis.patch.yml      # 插件行：装进 profile 的那一条 insert
+|-- src/
+|   |-- index.js          # 服务端插件：会话跟踪、配置、/plugins/dsh-pet-astra-yao/* 接口
+|   |-- state.js          # 会话事件 → 桌宠状态（纯函数，便于测试）
+|   |-- atlas.js          # Codex atlas 契约：行列、帧数、方向、取帧算法
+|   |-- config.js         # 配置归一化与 PATCH 校验
+|   `-- client.core.js    # 浏览器端源码（影子 DOM、拖拽、右键菜单、轮询）
+|-- scripts/
+|   |-- build-client.mjs  # 把 client.core.js 打包成 lib/client.js
+|   `-- verify.mjs        # 安装前自检：清单、补丁、bundle、atlas
+|-- lib/client.js         # 构建产物（已提交，DSH 启动时直接加载）
+|-- test/                 # node:test 单测（atlas / state / config / client / host）
+|-- pet.json              # Codex 宠物清单（保留，Codex 端仍可用）
+|-- spritesheet.webp      # 图集，同时被 DSH 插件以 /assets 接口提供
+|-- USAGE.md              # 原 Codex 桌面端安装说明
+`-- README.md
 ```
 
-- `pet.json`: Codex pet manifest. It defines the pet ID, display name, description, sprite version, and spritesheet path.
-- `spritesheet.webp`: Codex v2 animated spritesheet, including the standard animations and 16 look directions.
-- `README.md`: Package overview.
-- `USAGE.md`: Installation and configuration guide.
+## 安装到 DSH
 
-## Manifest
+DSH 的插件是「profile 里的一个依赖 + 一条 bundle 记录」。本仓库根目录就是插件包，所以有两种装法。
+
+**方式一：命令行（推荐，路径换成你本地的仓库位置）**
+
+```powershell
+dsh plugin --profile desktop add D:\Repos\pet-astra-yao
+```
+
+这一步只把包装进 profile 的 `node_modules`；再让 profile 认识它——在
+`%USERPROFILE%\.dsh\profiles\desktop\package.json` 的 `dsh.profile.bundles` 数组末尾追加包名：
 
 ```json
-{
-  "id": "astra-yao",
-  "displayName": "Astra Yao",
-  "description": "A tiny Codex desktop pet inspired by Astra Yao: dark teal long-haired stage singer with red-black jacket, white dress, and tall gold ring microphone staff.",
-  "spriteVersionNumber": 2,
-  "spritesheetPath": "spritesheet.webp"
+"dsh": {
+  "profile": {
+    "bundles": [ "...原有的那些 bundle...", "dsh-pet-astra-yao" ]
+  }
 }
 ```
 
-## Install
+（`"...原有的那些 bundle..."` 用文件里原本的条目替换，别把别的插件挤掉。）
 
-Copy this folder into your local Codex pets directory:
+**方式二：图形界面**
+
+打开 DSH Web 的「设置 → 插件」，用「从本地路径安装」填本仓库的绝对路径，装完点「立即启用」。
+插件页会读到 `cordis.patch.yml`，把配置渲染成表单。
+
+装好后刷新页面：右下角出现 Astra Yao 即成功。它和别的桌宠插件（例如 `dsh-pet-remielle`）可以同时存在，
+各自记住自己的位置。
+
+## 交互
+
+| 操作 | 效果 |
+| --- | --- |
+| 拖动 | 移动位置（拖动时播放左右跑），松手后坐标存回配置；`locked` 时不可拖 |
+| 单击 | 戳一下：挥手；若当前是报错状态，则点一下即「我知道了」，回到待机 |
+| 右键 | 打开菜单：显示桌宠、大小、不透明度、锁定位置、左右镜像、回右下角、我知道了 |
+| 隐藏后 | 右下角留一个小圆点，点它把桌宠叫回来 |
+| 鼠标移动 | 待机时会看向光标（用图集第 9–10 行的 16 个朝向） |
+
+## 状态映射
+
+服务端订阅 DSH 的会话事件，折算成一个状态后再喂给客户端：
+
+| DSH 会话 | 桌宠 |
+| --- | --- |
+| `turn/start` | 思考中（`review`，翻谱） |
+| `tool/call`（有工具在跑） | 执行中（`running`，小跑） |
+| `ask_user_question` / `exit_plan_mode` / `approval/asked` | 等待确认（`waiting`，托腮） |
+| `turn/end` 且 `reason.kind === "completed"` | 待机 + 跳一下（`jumping`，5 秒内一次） |
+| 工具报错 / 异常结束 | 出错（`failed`，躺平），点一下或开始下一轮对话后恢复 |
+| `turn/end` 且 `blocked` | 等待确认 |
+| `turn/end` 且 `aborted` / `disposed` | 待机 |
+
+子会话默认被忽略；把 `includeSubagents` 打开后，子代理的活动也会驱动桌宠。
+
+## 配置
+
+配置存在 profile 的 `cordis.patch.yml`（也就是插件页表单背后的那份），字段如下：
+
+| 字段 | 默认 | 说明 |
+| --- | --- | --- |
+| `enabled` | `true` | 是否启用这个插件 |
+| `scale` | `1` | 缩放，0.5–2 |
+| `opacity` | `1` | 不透明度，0.3–1 |
+| `mirror` | `false` | 左右镜像 |
+| `locked` | `false` | 锁定位置，禁止拖动 |
+| `hidden` | `false` | 隐藏（留一个小圆点） |
+| `paused` | `false` | 暂停逐帧动画，只画当前帧 |
+| `includeSubagents` | `false` | 子代理是否也驱动桌宠 |
+| `posX` / `posY` | `null` | 上次拖到的位置，`null` 表示贴右下角 |
+
+拖拽、菜单里的改动会 `PATCH` 回服务端，服务端再写进配置作用域；下次打开页面自动恢复。
+
+## HTTP 接口
+
+都挂在 `/plugins/dsh-pet-astra-yao` 下，只接受本机回环地址（非回环、Host/Origin 不匹配一律 403）：
+
+| 方法 | 路径 | 用途 |
+| --- | --- | --- |
+| `GET` | `/state` | 一次快照：插件版本、配置、图集描述、当前会话状态 |
+| `GET` `PATCH` `POST` | `/config` | 读配置 / 合并式改配置（未知字段 400） |
+| `POST` | `/ack` | 清掉报错状态（桌宠「我知道了」） |
+| `GET` | `/spritesheet` | 图集本体，`image/webp` |
+| `GET` | `/manifest` | `pet.json` |
+
+客户端不依赖任何前端框架，只用 DSH 的基线模块，所以 `dsh.client.inject` 是空数组。
+
+服务端对 `@deepseek-ai/schemastery` 是「有则用、无则跳」：`dsh plugin add <本地路径>` 的 link 安装不会装这个包的
+依赖，拿不到布局描述（schema）时插件照常跑，只是「设置 → 插件」里没有表单；registry 安装则会正常解析。
+
+## 开发
 
 ```powershell
-$source = "C:\repos\codex-pet-Astra-Yao-main\codex-pet-Astra-Yao-main"
-Copy-Item -Path $source -Destination "$env:USERPROFILE\.codex\pets\astra-yao" -Recurse -Force
+npm run build     # 改完 src/client.core.js 后重新生成 lib/client.js
+npm run verify    # 自检：清单字段、补丁行、bundle、图集尺寸（1536×2288 / v2）
+npm test          # node:test：atlas / config / state / client / host / server 共 41 个用例
 ```
 
-Then restart Codex Desktop if the pet does not appear immediately.
+`lib/client.js` 是提交进仓库的构建产物：DSH 启动时直接读它，不会帮你编译，所以改完源码记得 `npm run build`
+再一起提交。
 
-## Asset Notes
+自己写桌宠时可以直接复用 `src/atlas.js`：它只描述 Codex atlas 的几何与动画表（行、帧数、间隔、朝向），
+不碰 DOM，也没有依赖。
 
-The spritesheet is `1536x2288`, matching the Codex v2 8-column x 11-row layout. Rows 0–8 contain the standard animations; rows 9–10 contain 16 clockwise look directions. The manifest therefore declares `"spriteVersionNumber": 2`.
+## 原 Codex 用法
+
+`pet.json` + `spritesheet.webp` 仍然是合法的 Codex 桌宠包，复制到
+`%USERPROFILE%\.codex\pets\astra-yao` 即可在 Codex Desktop 里使用，细节见 [USAGE.md](./USAGE.md)。
+
+## 素材说明
+
+像素美术与角色形象来自原仓库，角色「Astra Yao（耀嘉音）」及相关设定的权利归原权利人所有；
+本仓库只做桌宠资源的整理与 DSH 插件化，未附带额外许可证。

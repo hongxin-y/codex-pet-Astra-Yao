@@ -2,6 +2,9 @@
 
 这份文档说明如何把 Astra Yao 配置为 Codex Desktop 自定义宠物。
 
+> 想在 **DeepSeek Harness（DSH）** 里用它？本仓库同时是一个 DSH 插件包，安装与配置见 [README.md](./README.md)；
+> 下面是原版 Codex Desktop 的用法。
+
 ## 1. 文件结构
 
 Codex 自定义宠物通常放在：
