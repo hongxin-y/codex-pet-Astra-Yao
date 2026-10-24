@@ -699,8 +699,8 @@ test('a slow arc holds each look cell instead of chattering at its edge', async 
   await feed(env, session)
   env.pump(0)
 
-  // 16 look cells are 22.5deg apart; the client adds a 6deg margin so a hand
-  // tracing a circle does not flip between two neighbours at every boundary.
+  // 16 look cells span the full screen-space circle in 22.5-degree steps;
+  // the client adds a circular hysteresis margin at boundaries.
   const aim = (degrees) => {
     const radians = (degrees * Math.PI) / 180
     env.advanceClock(120)
@@ -712,15 +712,15 @@ test('a slow arc holds each look cell instead of chattering at its edge', async 
   }
 
   aim(0)
-  assert.equal(sprite.style.backgroundPosition, '0px -1404px', 'straight up is cell 0')
+  assert.equal(sprite.style.backgroundPosition, '0px -1404px', 'a cursor above the pet selects up')
   aim(14)
-  assert.equal(sprite.style.backgroundPosition, '0px -1404px', '14deg stays inside cell 0')
+  assert.equal(sprite.style.backgroundPosition, '-144px -1404px', '14deg crosses the up-cell hysteresis margin')
   aim(20)
-  assert.equal(sprite.style.backgroundPosition, '-144px -1404px', '20deg commits cell 1')
+  assert.equal(sprite.style.backgroundPosition, '-144px -1404px', '20deg remains in the next clockwise cell')
   aim(12)
   assert.equal(sprite.style.backgroundPosition, '-144px -1404px', 'walking back does not bounce immediately')
   aim(4)
-  assert.equal(sprite.style.backgroundPosition, '0px -1404px', 'past the margin it returns to cell 0')
+  assert.equal(sprite.style.backgroundPosition, '0px -1404px', 'past the margin it returns to up')
 })
 
 test('pointer look follows a nearby cursor and can be switched off', async () => {
@@ -734,7 +734,7 @@ test('pointer look follows a nearby cursor and can be switched off', async () =>
   env.advanceClock(120) // pointer look throttles at 60 ms
   env.fireWindow('pointermove', { clientX: 72 + 120, clientY: 78 })
   env.pump(0)
-  assert.equal(sprite.style.backgroundPosition, '-576px -1404px', 'a nearby cursor shows the look-right cell')
+  assert.equal(sprite.style.backgroundPosition, '-576px -1404px', 'a nearby cursor to the right selects the right-facing look')
 
   // The glance relaxes back into the idle loop after a couple of seconds.
   env.advanceClock(2600)

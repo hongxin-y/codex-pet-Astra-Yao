@@ -40,8 +40,8 @@ EXPECTED = {
     6: ("waiting", (6,)),
     7: ("running", (6,)),
     8: ("review", (6,)),
-    9: ("look 000-157.5", (0, 8)),
-    10: ("look 180-337.5", (0, 8)),
+    9: ("look 000 to 157.5", (0, 8)),
+    10: ("look 180 to 337.5", (0, 8)),
 }
 RUN_ROWS = (1, 2, 7)
 GROUNDED_ROWS = (0, 3, 5, 6, 8, 9, 10)
@@ -70,12 +70,8 @@ def measure(cell: Image.Image) -> dict | None:
 
 
 def face_pixels(cell: Image.Image) -> int:
-    """Count skin-toned pixels: a cheap proxy for how much face is visible.
-
-    A real 16-step turntable hides the face at the back and cuts it roughly in
-    half at the sides, so the count must swing widely across rows 9-10.
-    """
-    data = cell.tobytes()
+    """Count face-region skin pixels, excluding the unchanged body and legs."""
+    data = cell.crop((55, 12, 150, 88)).tobytes()
     count = 0
     for index in range(0, len(data), 4):
         r, g, b, a = data[index], data[index + 1], data[index + 2], data[index + 3]
@@ -84,8 +80,8 @@ def face_pixels(cell: Image.Image) -> int:
     return count
 
 
-def look_turntable(image: Image.Image) -> dict | None:
-    faces, widths = [], []
+def look_direction_stats(image: Image.Image) -> dict | None:
+    faces, widths, row_heights = [], [], [[], []]
     for index in range(16):
         row, column = 9 + index // 8, index % 8
         x, y = column * CELL_WIDTH, row * CELL_HEIGHT
@@ -95,13 +91,21 @@ def look_turntable(image: Image.Image) -> dict | None:
             return None
         faces.append(face_pixels(cell))
         widths.append(box[2] - box[0])
-    top = max(faces) or 1
-    spread = (max(faces) - min(faces)) / top
+        row_heights[index // 8].append(box[3] - box[1])
+    peak = max(faces) or 1
+    spread = (max(faces) - min(faces)) / peak
+    median_heights = [statistics.median(heights) for heights in row_heights]
+    height_spread = abs(median_heights[0] - median_heights[1]) / max(median_heights)
     return {
         "faces": faces,
         "widths": widths,
         "faceSpread": round(spread, 3),
         "widthSpread": round((max(widths) - min(widths)) / (max(widths) or 1), 3),
+        "rowMedianHeights": median_heights,
+        "rowHeightSpread": round(height_spread, 3),
+        "cardinalFacePixels": {
+            "up": faces[0], "right": faces[4], "down": faces[8], "left": faces[12],
+        },
     }
 
 
@@ -187,15 +191,18 @@ def audit_image(image: Image.Image, file_size: int = 0) -> dict:
     if not per_row[9] and not per_row[10]:
         report["notes"].append("Look poses are omitted; consumers must keep pointer look disabled.")
     else:
-        turntable = look_turntable(image)
-        if turntable is not None:
-            report["look"] = turntable
-            if turntable["faceSpread"] < 0.45:
+        directions = look_direction_stats(image)
+        if directions is not None:
+            report["look"] = directions
+            if directions["rowHeightSpread"] > 0.02:
+                problems.append(
+                    "look row median heights differ by "
+                    f"{directions['rowHeightSpread']:.1%}; keep the two direction rows within 2%"
+                )
+            if directions["faceSpread"] < 0.35:
                 report["notes"].append(
-                    "Look rows 9-10 barely change the visible face "
-                    f"(spread {turntable['faceSpread']:.0%}): they read as 16 near-identical front "
-                    "views, so pointer look looks like a twitch instead of a turn. Redraw them as a "
-                    "real turntable (see docs/atlas-brief.md)."
+                    "Look rows 9-10 show little face change across the 360-degree direction loop "
+                    f"(face spread {directions['faceSpread']:.0%}); inspect all four cardinal directions."
                 )
     return report
 
@@ -224,8 +231,10 @@ def main() -> int:
                   f"{entry.get('boundsBottom', 0):>7g}")
         look = report.get("look")
         if look:
-            print(f"{'look':>3}  {'directions':<16} {len(look['faces']):>2}/16    "
-                  f"face spread {look['faceSpread']:>5.0%}  width spread {look['widthSpread']:>5.0%}")
+            print(f"{'look':>3}  {'360-degree loop':<16} {len(look['faces']):>2}/16    "
+                  f"face spread {look['faceSpread']:>5.0%}  cell width {look['widthSpread']:>5.0%}  "
+                  f"row heights {look['rowMedianHeights'][0]:g}/{look['rowMedianHeights'][1]:g}px")
+            print(f"     cardinal face pixels: {look['cardinalFacePixels']}")
         for note in report["notes"]:
             print(f"note   {note}")
         for problem in report["problems"]:

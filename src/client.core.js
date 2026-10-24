@@ -36,9 +36,7 @@ const PLUGIN_ID = 'dsh-pet-astra-yao'
 const ROOT_ID = 'dsh-pet-astra-yao-root'
 const BASE_WIDTH = 144
 const LOOK_DEADZONE = 56
-// Beyond this radius the pet stops tracking the pointer and returns to its
-// idle loop: the look cells are narrow profile frames, so a cursor parked far
-// away would otherwise freeze the pet in a "smaller" pose forever.
+// Keep pointer tracking local to the widget; a distant cursor returns to idle.
 const LOOK_RANGE = 280
 /** How long a glance at a parked cursor is held before the idle loop resumes. */
 const LOOK_HOLD_MS = 2500
@@ -429,24 +427,25 @@ function animationOf(name) {
   return LOCAL_ANIMATIONS[name] ?? ANIMATIONS[name] ?? ANIMATIONS.idle
 }
 
-// The look rows are 16 discrete cells, so a slow arc would otherwise flip
-// between two neighbours every few degrees. A cell is only left once the
-// pointer is past its 22.5deg wedge plus this margin.
-const LOOK_HYSTERESIS_DEGREES = 6
+// Hold each 22.5-degree look cell slightly past its boundary to avoid chatter.
+const LOOK_STEP_DEGREES = 360 / LOOK_CELLS
+const LOOK_HYSTERESIS_DEGREES = 2.5
 let lookIndex = -1
 
 function cellAtIndex(index) {
-  const safe = ((Math.round(index) % LOOK_CELLS) + LOOK_CELLS) % LOOK_CELLS
+  const rounded = Math.round(index)
+  const safe = ((rounded % LOOK_CELLS) + LOOK_CELLS) % LOOK_CELLS
   return { row: LOOK_ROW + Math.floor(safe / COLUMNS), column: safe % COLUMNS, index: safe }
 }
 
 function cellForVector(dx, dy) {
-  const step = 360 / LOOK_CELLS
-  const degrees = (((Math.atan2(dx, -dy) * 180) / Math.PI) % 360 + 360) % 360
-  const target = Math.round(degrees / step) % LOOK_CELLS
+  // Screen-space clockwise directions: 0 up, 90 right, 180 down, 270 left.
+  const degrees = ((Math.atan2(dx, -dy) * 180) / Math.PI + 360) % 360
+  const target = Math.round(degrees / LOOK_STEP_DEGREES) % LOOK_CELLS
   if (lookIndex >= 0 && target !== lookIndex) {
-    const offset = ((degrees - lookIndex * step + 540) % 360) - 180
-    if (Math.abs(offset) <= step / 2 + LOOK_HYSTERESIS_DEGREES) return cellAtIndex(lookIndex)
+    const center = lookIndex * LOOK_STEP_DEGREES
+    const offset = ((degrees - center + 540) % 360) - 180
+    if (Math.abs(offset) <= LOOK_STEP_DEGREES / 2 + LOOK_HYSTERESIS_DEGREES) return cellAtIndex(lookIndex)
   }
   lookIndex = target
   return cellAtIndex(target)

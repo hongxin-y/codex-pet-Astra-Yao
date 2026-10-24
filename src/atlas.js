@@ -12,10 +12,12 @@
  *   row 6  waiting             6 frames
  *   row 7  running             6 frames
  *   row 8  review              6 frames
- *   row 9  look directions   000deg .. 157.5deg
- *   row 10 look directions   180deg .. 337.5deg
+ *   row 9  clockwise screen-space look directions 000..157.5 degrees
+ *   row 10 clockwise screen-space look directions 180..337.5 degrees
  *
- * Look cells step clockwise in 22.5deg increments and start at "up".
+ * Look cells span a full 360deg cursor-look loop in 22.5deg increments:
+ * 000 up, 090 right, 180 down, 270 left. The lower body stays anchored while
+ * the head, neck, shoulders and upper body follow the gaze naturally.
  * This module is dependency-free so the host plugin, the browser client
  * (through the build script) and the tests all share one source of truth.
  */
@@ -30,7 +32,8 @@ export const SPRITE_VERSION = 2
 
 export const LOOK_ROW = 9
 export const LOOK_CELLS = 16
-export const LOOK_STEP_DEGREES = 360 / LOOK_CELLS // 22.5
+export const LOOK_SWEEP_DEGREES = 360
+export const LOOK_STEP_DEGREES = LOOK_SWEEP_DEGREES / LOOK_CELLS // 22.5
 
 /**
  * The repaired atlas uses the native rows without skipped or duplicated
@@ -110,24 +113,28 @@ export function normalizeDegrees(degrees) {
   return ((value % 360) + 360) % 360
 }
 
-/** Look-direction cell index (0 = up, clockwise, 16 steps). */
+/** Look cell around the full screen-space loop (0 = up, 90 = right, 180 = down, 270 = left). */
 export function lookIndexOfDegrees(degrees) {
-  return Math.round(normalizeDegrees(degrees) / LOOK_STEP_DEGREES) % LOOK_CELLS
+  const value = Number(degrees)
+  const normalized = normalizeDegrees(Number.isFinite(value) ? value : 0)
+  return Math.round(normalized / LOOK_STEP_DEGREES) % LOOK_CELLS
 }
 
 /** Grid cell of a look-direction index. */
 export function lookCell(index) {
-  const i = ((Math.round(Number(index) || 0) % LOOK_CELLS) + LOOK_CELLS) % LOOK_CELLS
+  const value = Number(index)
+  const rounded = Math.round(Number.isFinite(value) ? value : 0)
+  const i = ((rounded % LOOK_CELLS) + LOOK_CELLS) % LOOK_CELLS
   return { row: LOOK_ROW + Math.floor(i / COLUMNS), column: i % COLUMNS }
 }
 
 /**
- * Look cell for a screen-space vector pointing from the pet to the pointer.
- * +x is right, +y is down, and 0deg points up.
+ * Map a screen-space cursor vector to the clockwise look loop. +x is right and
+ * +y is down; zero degrees points upward from the pet.
  */
 export function lookCellForVector(dx, dy) {
   if (!Number.isFinite(dx) || !Number.isFinite(dy)) return null
-  const degrees = (Math.atan2(dx, -dy) * 180) / Math.PI
+  const degrees = normalizeDegrees((Math.atan2(dx, -dy) * 180) / Math.PI)
   return lookCell(lookIndexOfDegrees(degrees))
 }
 

@@ -87,8 +87,8 @@ function torsoCenter(data, width, height) {
 }
 
 function legCenter(data, width, height) {
-  // The bodice disappears in rear views; exposed leg pixels remain a stable
-  // body pivot throughout the turn. Gold/black staff and dark hair are excluded.
+  // Exposed leg pixels keep grounded frames aligned while excluding the
+  // asymmetric staff and hair from the horizontal body pivot.
   let mass = 0, center = 0
   for (let y = Math.floor(height * 0.70); y < Math.floor(height * 0.97); y++) {
     for (let x = 0; x < width; x++) {
@@ -114,7 +114,6 @@ function put(row, column, data, width = W, height = H, left = 0, top = 0) {
 }
 
 async function placeGenerated(frames, destinations, {
-  allowCenterFallback = false,
   anchor = 'torso',
   scaleOverride,
   alignBottom = true,
@@ -124,24 +123,19 @@ async function placeGenerated(frames, destinations, {
   const scale = scaleOverride ?? (198 / median(frames.map((frame) => frame.height)))
   for (let index = 0; index < frames.length; index++) {
     const frame = frames[index]
-    const width = Math.round(frame.width * scale), height = Math.round(frame.height * scale)
-    const resized = await sharp(frame.data, { raw: { width: frame.width, height: frame.height, channels: 4 } })
-      .resize(width, height, { fit: 'fill', kernel: sharp.kernel.nearest }).raw().toBuffer()
-    let bodyAnchor
-    try {
-      bodyAnchor = anchor === 'legs' ? legCenter(resized, width, height) : torsoCenter(resized, width, height)
-    } catch (error) {
-      if (!allowCenterFallback) throw error
-      // An exact back view can hide the white bodice anchor beneath the hair.
-      // In that case the generated panel itself is centered on the body pivot.
-      bodyAnchor = width / 2
-    }
+    const height = Math.round(frame.height * scale)
+    const resizedResult = await sharp(frame.data, { raw: { width: frame.width, height: frame.height, channels: 4 } })
+      .resize({ height, kernel: sharp.kernel.nearest }).raw().toBuffer({ resolveWithObject: true })
+    const { data: resized, info: { width } } = resizedResult
+    const bodyAnchor = anchor === 'legs'
+      ? legCenter(resized, width, height)
+      : torsoCenter(resized, width, height)
     const desiredLeft = Math.round(masterAnchor - bodyAnchor)
     const maxLeft = W - 1 - width
     if (maxLeft < 1) throw new Error(`Frame ${destinations[index]} is wider than its cell: ${width}px`)
     const left = Math.max(1, Math.min(maxLeft, desiredLeft))
     if (Math.abs(left + bodyAnchor - masterAnchor) > 6) {
-      throw new Error(`Body anchor for ${destinations[index]} would land outside x=${masterAnchor.toFixed(1)} +/- 6`)
+      throw new Error(`Body anchor for ${destinations[index]} would land at x=${(left + bodyAnchor).toFixed(1)} outside ${masterAnchor.toFixed(1)} +/- 6; frame ${width}x${height}, anchor ${bodyAnchor.toFixed(1)}, desired left ${desiredLeft}`)
     }
     const sourceTop = frame.offset?.top ?? 0
     const proposedTop = alignBottom ? 203 - height : Math.max(1, Math.round(sourceTop * scale))
@@ -183,25 +177,35 @@ async function gridFrames(path, count, { columns = 4, rows = 2, frameBounds = {}
   return frames
 }
 
-const idleFrames = await gridFrames(normalizedSources.idle, 7)
+const idleSourceFrames = await gridFrames(normalizedSources.idle, 7)
+// The source's later idle variants change the visible lower-body length. Hold
+// one open-eye master pose and use its scale-matched blink frame so the loop
+// cannot appear to shrink or bob between unrelated generated poses.
+const idleFrames = [
+  idleSourceFrames[0],
+  idleSourceFrames[0],
+  idleSourceFrames[1],
+  idleSourceFrames[0],
+  idleSourceFrames[0],
+  idleSourceFrames[0],
+]
 const idleScale = 198 / median(idleFrames.map((frame) => frame.height))
 await placeGenerated(idleFrames, idleFrames.map((_, column) => [0, column]), { scaleOverride: idleScale })
 
 const runFrames = await gridFrames(normalizedSources.run, 8)
-const runScale = 198 / median(runFrames.map((frame) => frame.height))
-await placeGenerated(runFrames, runFrames.map((_, column) => [2, column]), { scaleOverride: runScale })
-const mirroredRunFrames = []
-for (const frame of runFrames) {
-  const data = await sharp(frame.data, { raw: { width: frame.width, height: frame.height, channels: 4 } }).flop().raw().toBuffer()
-  mirroredRunFrames.push({ ...frame, data })
-}
-await placeGenerated(mirroredRunFrames, mirroredRunFrames.map((_, column) => [1, column]), { scaleOverride: runScale })
+const runLeftScale = 198 / median(runFrames.map((frame) => frame.height))
+await placeGenerated(runFrames, runFrames.map((_, column) => [2, column]), { scaleOverride: runLeftScale })
+const runRightSource = fileURLToPath(new URL(`${normalizedRoot}run-right.png`, root))
+const runRightFrames = await gridFrames(runRightSource, 8, { columns: 4, rows: 2 })
+const runRightScale = 197 / median(runRightFrames.map((frame) => frame.height))
+await placeGenerated(runRightFrames, runRightFrames.map((_, column) => [1, column]), { scaleOverride: runRightScale })
 const workingPhases = [0, 1, 3, 4, 5, 7]
 const workingFrames = workingPhases.map((phase) => runFrames[phase])
-await placeGenerated(workingFrames, workingFrames.map((_, column) => [7, column]), { scaleOverride: runScale })
+await placeGenerated(workingFrames, workingFrames.map((_, column) => [7, column]), { scaleOverride: runLeftScale })
 
 const waveFrames = await gridFrames(normalizedSources.wave, 4, { columns: 2, rows: 2 })
-const waveScale = await placeGenerated(waveFrames, waveFrames.map((_, column) => [3, column]))
+const waveScale = 198 / Math.max(...waveFrames.map((frame) => frame.height))
+await placeGenerated(waveFrames, waveFrames.map((_, column) => [3, column]), { anchor: 'legs', scaleOverride: waveScale })
 
 // The fourth jump pose extends slightly below the top-row divider; include its
 // full shoes instead of clipping them at the nominal 2-row panel boundary.
@@ -212,64 +216,35 @@ await placeGenerated(jumpFrames, jumpFrames.map((_, column) => [4, column]), {
   alignBottom: false,
 })
 
-const failedFrames = await gridFrames(normalizedSources.failed, 8)
-const failedScale = await placeGenerated(failedFrames, failedFrames.map((_, column) => [5, column]))
+const failedFrames = await gridFrames(normalizedSources.failed, 8, { columns: 4, rows: 2 })
+const failedScale = 198 / Math.max(...failedFrames.map((frame) => frame.height))
+await placeGenerated(failedFrames, failedFrames.map((_, column) => [5, column]), { anchor: 'legs', scaleOverride: failedScale })
 
 const waitingFrames = await gridFrames(normalizedSources.waiting, 6)
 const waitingScale = await placeGenerated(waitingFrames, waitingFrames.map((_, column) => [6, column]))
 
-const reviewFrames = await gridFrames(normalizedSources.review, 6)
-const reviewScale = await placeGenerated(reviewFrames, reviewFrames.map((_, column) => [8, column]))
+const reviewFrames = await gridFrames(normalizedSources.review, 6, { columns: 3, rows: 2 })
+const reviewScale = 198 / Math.max(...reviewFrames.map((frame) => frame.height))
+await placeGenerated(reviewFrames, reviewFrames.map((_, column) => [8, column]), { anchor: 'legs', scaleOverride: reviewScale })
 
-const turnRoot = 'assets/atlas-source/turntable/'
-const turnSources = {
-  cardinals: fileURLToPath(new URL(`${turnRoot}cardinals.png`, root)),
-  frontToRight: fileURLToPath(new URL(`${turnRoot}front-to-right.png`, root)),
-  rightToBack: fileURLToPath(new URL(`${turnRoot}right-to-back.png`, root)),
-  backToLeft: fileURLToPath(new URL(`${turnRoot}back-to-left.png`, root)),
-  leftToFront: fileURLToPath(new URL(`${turnRoot}left-to-front.png`, root)),
-}
-
-async function stripFrame(path, index, count = 4, { minComponent = 24 } = {}) {
-  const meta = await sharp(path).metadata()
-  const left = Math.floor(meta.width * index / count)
-  const right = Math.floor(meta.width * (index + 1) / count)
-  // Turnaround sheets are generated in separate batches. Strip isolated
-  // matte fragments without changing attached hair, jewelry, or the staff.
-  const frame = await readFrame(path, { left, top: 0, width: right - left, height: meta.height }, { minComponent })
-  return frame
-}
-
-const turnStripFrame = (path, index, count = 4) => stripFrame(path, index, count, { minComponent: 5000 })
-
-const lookFrames = [
-  await turnStripFrame(turnSources.cardinals, 0),
-  await turnStripFrame(turnSources.frontToRight, 1),
-  await turnStripFrame(turnSources.frontToRight, 2),
-  await turnStripFrame(turnSources.frontToRight, 3),
-  await turnStripFrame(turnSources.cardinals, 1),
-  await turnStripFrame(turnSources.rightToBack, 1),
-  await turnStripFrame(turnSources.rightToBack, 2),
-  await turnStripFrame(turnSources.rightToBack, 3),
-  await turnStripFrame(turnSources.cardinals, 2),
-  await turnStripFrame(turnSources.backToLeft, 1),
-  await turnStripFrame(turnSources.backToLeft, 2),
-  await turnStripFrame(turnSources.backToLeft, 3),
-  await turnStripFrame(turnSources.cardinals, 3),
-  await turnStripFrame(turnSources.leftToFront, 1),
-  await turnStripFrame(turnSources.leftToFront, 2),
-  await turnStripFrame(turnSources.leftToFront, 3),
-]
-const lookDestinations = lookFrames.map((_, index) => [9 + Math.floor(index / 8), index % 8])
-const lookScales = []
-for (const indexes of [[0], [1, 2, 3], [4], [5, 6, 7], [8], [9, 10, 11], [12], [13, 14, 15]]) {
-  const frames = indexes.map((index) => lookFrames[index])
-  const destinations = indexes.map((index) => lookDestinations[index])
-  lookScales.push(await placeGenerated(frames, destinations, { allowCenterFallback: true, anchor: 'legs' }))
-}
+const lookRoot = 'assets/atlas-source/look/'
+const lookRow9Source = fileURLToPath(new URL(`${lookRoot}row9-000-157.png`, root))
+const lookRow10Source = fileURLToPath(new URL(`${lookRoot}row10-180-337.png`, root))
+const lookRow9Frames = await gridFrames(lookRow9Source, 8, { columns: 4, rows: 2 })
+const lookRow10Frames = await gridFrames(lookRow10Source, 8, { columns: 4, rows: 2 })
+const lookRow9Scale = 198 / median(lookRow9Frames.map((frame) => frame.height))
+const lookRow10Scale = 198 / median(lookRow10Frames.map((frame) => frame.height))
+await placeGenerated(lookRow9Frames, lookRow9Frames.map((_, column) => [9, column]), {
+  anchor: 'legs',
+  scaleOverride: lookRow9Scale,
+})
+await placeGenerated(lookRow10Frames, lookRow10Frames.map((_, column) => [10, column]), {
+  anchor: 'legs',
+  scaleOverride: lookRow10Scale,
+})
 // Encode before writing so a packing/encoding error leaves the asset intact.
 const encoded = await sharp(pixels, { raw: { width: SHEET_WIDTH, height: SHEET_HEIGHT, channels: 4 } })
   .webp({ lossless: true, effort: 6 }).toBuffer()
 await writeFile(output, encoded)
 console.log(`Packed ${SHEET_WIDTH}x${SHEET_HEIGHT} lossless RGBA WebP (${(encoded.length / 1024).toFixed(1)} KiB)`)
-console.log(`Shared scales: idle ${idleScale.toFixed(4)}, run ${runScale.toFixed(4)}, wave ${waveScale.toFixed(4)}, jump ${jumpScale.toFixed(4)}, failed ${failedScale.toFixed(4)}, waiting ${waitingScale.toFixed(4)}, review ${reviewScale.toFixed(4)}, look ${lookScales.map((scale) => scale.toFixed(4)).join(', ')}; standing occupied bottom 203`)
+console.log(`Shared scales: idle ${idleScale.toFixed(4)}, run left ${runLeftScale.toFixed(4)}, run right ${runRightScale.toFixed(4)}, wave ${waveScale.toFixed(4)}, jump ${jumpScale.toFixed(4)}, failed ${failedScale.toFixed(4)}, waiting ${waitingScale.toFixed(4)}, review ${reviewScale.toFixed(4)}, look rows ${lookRow9Scale.toFixed(4)}/${lookRow10Scale.toFixed(4)}; standing occupied bottom 203`)

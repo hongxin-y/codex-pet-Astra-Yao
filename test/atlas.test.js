@@ -74,7 +74,7 @@ test('looping and one-shot frame math agree', () => {
   assert.equal(isFinished('jumping', 100), false)
 })
 
-test('look directions are clockwise starting at up', () => {
+test('look directions span a clockwise 360-degree screen-space loop', () => {
   assert.equal(normalizeDegrees(0), 0)
   assert.equal(normalizeDegrees(-90), 270)
   assert.equal(normalizeDegrees(720 + 45), 45)
@@ -85,7 +85,7 @@ test('look directions are clockwise starting at up', () => {
   assert.equal(lookIndexOfDegrees(180), 8)
   assert.equal(lookIndexOfDegrees(270), 12)
   assert.equal(lookIndexOfDegrees(359), 0)
-  assert.equal(lookIndexOfDegrees(350), 16 % LOOK_CELLS)
+  assert.equal(lookIndexOfDegrees(-20), 15)
 
   assert.deepEqual(lookCell(0), { row: 9, column: 0 })
   assert.deepEqual(lookCell(7), { row: 9, column: 7 })
@@ -94,7 +94,7 @@ test('look directions are clockwise starting at up', () => {
   assert.deepEqual(lookCell(16), { row: 9, column: 0 })
 })
 
-test('screen vectors map to the right look cell', () => {
+test('screen vectors map to the four clockwise look cardinals', () => {
   assert.deepEqual(lookCellForVector(0, -10), { row: 9, column: 0 }) // up
   assert.deepEqual(lookCellForVector(10, 0), { row: 9, column: 4 }) // right
   assert.deepEqual(lookCellForVector(0, 10), { row: 10, column: 0 }) // down
