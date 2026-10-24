@@ -1,0 +1,61 @@
+{
+  "ok": true,
+  "strip": "D:\\Repos\\pet-astra-yao\\.tmp-atlas-review\\coherent-repair\\decoded\\cardinals.png",
+  "directions": [
+    "000",
+    "090",
+    "180",
+    "270"
+  ],
+  "errors": [],
+  "anchors": [
+    {
+      "direction": "000",
+      "source_box": [
+        0,
+        0,
+        496,
+        666
+      ],
+      "used_pixels": 174438,
+      "edge_pixels": 0,
+      "output": "D:\\Repos\\pet-astra-yao\\.tmp-atlas-review\\coherent-repair\\cardinals\\000.png"
+    },
+    {
+      "direction": "090",
+      "source_box": [
+        496,
+        0,
+        992,
+        666
+      ],
+      "used_pixels": 175577,
+      "edge_pixels": 0,
+      "output": "D:\\Repos\\pet-astra-yao\\.tmp-atlas-review\\coherent-repair\\cardinals\\090.png"
+    },
+    {
+      "direction": "180",
+      "source_box": [
+        992,
+        0,
+        1488,
+        666
+      ],
+      "used_pixels": 175128,
+      "edge_pixels": 0,
+      "output": "D:\\Repos\\pet-astra-yao\\.tmp-atlas-review\\coherent-repair\\cardinals\\180.png"
+    },
+    {
+      "direction": "270",
+      "source_box": [
+        1488,
+        0,
+        1984,
+        666
+      ],
+      "used_pixels": 178348,
+      "edge_pixels": 0,
+      "output": "D:\\Repos\\pet-astra-yao\\.tmp-atlas-review\\coherent-repair\\cardinals\\270.png"
+    }
+  ]
+}

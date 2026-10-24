@@ -1,0 +1,17 @@
+{
+  "ok": true,
+  "input": "D:\\Repos\\pet-astra-yao\\.tmp-atlas-review\\coherent-repair\\final-candidate.png",
+  "output": "D:\\Repos\\pet-astra-yao\\.tmp-atlas-review\\coherent-repair\\cleaned.png",
+  "chroma_key": "#FF00FF",
+  "algorithm": "edge-local-chroma-spill-suppression",
+  "strength": 0.0,
+  "edge_radius": 5,
+  "spill_tolerance": 0.15,
+  "minimum_saturation": 0.1,
+  "changed_pixels": 0,
+  "decontaminated_pixels": 0,
+  "spill_suppressed_pixels": 0,
+  "rejected_pixels": 0,
+  "changed_by_cell": {},
+  "alpha_preserved": true
+}

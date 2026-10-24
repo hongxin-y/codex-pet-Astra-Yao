@@ -1,0 +1,536 @@
+{
+  "idle": {
+    "source": "assets/atlas-source/normalized/idle.png",
+    "sourceSize": [
+      1704,
+      923
+    ],
+    "boxes": [
+      [
+        47,
+        1,
+        335,
+        469
+      ],
+      [
+        47,
+        1,
+        335,
+        469
+      ],
+      [
+        471,
+        1,
+        337,
+        469
+      ],
+      [
+        47,
+        1,
+        335,
+        469
+      ],
+      [
+        47,
+        1,
+        335,
+        469
+      ],
+      [
+        47,
+        1,
+        335,
+        469
+      ]
+    ],
+    "touches": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ],
+    "stripSize": [
+      2214,
+      501
+    ]
+  },
+  "running-right": {
+    "source": "assets/atlas-source/normalized/run-right.png",
+    "sourceSize": [
+      1774,
+      887
+    ],
+    "boxes": [
+      [
+        30,
+        9,
+        342,
+        441
+      ],
+      [
+        487,
+        9,
+        336,
+        441
+      ],
+      [
+        925,
+        9,
+        351,
+        443
+      ],
+      [
+        1397,
+        10,
+        329,
+        441
+      ],
+      [
+        34,
+        449,
+        347,
+        426
+      ],
+      [
+        483,
+        449,
+        340,
+        434
+      ],
+      [
+        927,
+        451,
+        355,
+        432
+      ],
+      [
+        1399,
+        449,
+        327,
+        432
+      ]
+    ],
+    "touches": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ],
+    "stripSize": [
+      3096,
+      475
+    ]
+  },
+  "running-left": {
+    "source": "assets/atlas-source/normalized/run.png",
+    "sourceSize": [
+      1704,
+      923
+    ],
+    "boxes": [
+      [
+        43,
+        4,
+        351,
+        456
+      ],
+      [
+        470,
+        4,
+        353,
+        456
+      ],
+      [
+        895,
+        4,
+        353,
+        456
+      ],
+      [
+        1322,
+        4,
+        353,
+        463
+      ],
+      [
+        38,
+        458,
+        352,
+        450
+      ],
+      [
+        463,
+        457,
+        360,
+        459
+      ],
+      [
+        886,
+        457,
+        367,
+        459
+      ],
+      [
+        1323,
+        458,
+        346,
+        458
+      ]
+    ],
+    "touches": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ],
+    "stripSize": [
+      3192,
+      495
+    ]
+  },
+  "waving": {
+    "source": "C:\\Users\\18918\\.codex\\generated_images\\01a16c76-a945-7131-a8f9-110d008b419d\\exec-09b53e2b-8295-4e1d-a2f4-901f2ad75e56.png",
+    "sourceSize": [
+      1127,
+      1396
+    ],
+    "boxes": [
+      [
+        92,
+        20,
+        436,
+        607
+      ],
+      [
+        624,
+        20,
+        436,
+        607
+      ],
+      [
+        91,
+        705,
+        436,
+        608
+      ],
+      [
+        622,
+        705,
+        437,
+        609
+      ]
+    ],
+    "touches": [
+      false,
+      false,
+      false,
+      false
+    ],
+    "stripSize": [
+      1876,
+      641
+    ]
+  },
+  "jumping": {
+    "source": "C:\\Users\\18918\\.codex\\generated_images\\01a16c76-a945-7131-a8f9-110d008b419d\\exec-14591125-6a33-4eaf-a9ee-252e19570698.png",
+    "sourceSize": [
+      1355,
+      1161
+    ],
+    "boxes": [
+      [
+        44,
+        59,
+        378,
+        498
+      ],
+      [
+        480,
+        48,
+        403,
+        487
+      ],
+      [
+        909,
+        44,
+        413,
+        461
+      ],
+      [
+        45,
+        615,
+        403,
+        472
+      ],
+      [
+        496,
+        618,
+        366,
+        503
+      ]
+    ],
+    "touches": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ],
+    "stripSize": [
+      2225,
+      545
+    ]
+  },
+  "failed": {
+    "source": "C:\\Users\\18918\\.codex\\generated_images\\01a16c76-a945-7131-a8f9-110d008b419d\\exec-9a6df7aa-aa50-4a75-92d9-2fdb9346d55e.png",
+    "sourceSize": [
+      1565,
+      1005
+    ],
+    "boxes": [
+      [
+        37,
+        22,
+        318,
+        439
+      ],
+      [
+        428,
+        22,
+        318,
+        439
+      ],
+      [
+        819,
+        22,
+        318,
+        439
+      ],
+      [
+        1211,
+        22,
+        317,
+        439
+      ],
+      [
+        36,
+        525,
+        319,
+        440
+      ],
+      [
+        428,
+        525,
+        318,
+        440
+      ],
+      [
+        819,
+        525,
+        318,
+        440
+      ],
+      [
+        1210,
+        525,
+        318,
+        440
+      ]
+    ],
+    "touches": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ],
+    "stripSize": [
+      2808,
+      472
+    ]
+  },
+  "waiting": {
+    "source": "C:\\Users\\18918\\.codex\\generated_images\\01a16c76-a945-7131-a8f9-110d008b419d\\exec-e46cf866-04b1-4f47-b391-a500f5cdbac3.png",
+    "sourceSize": [
+      1355,
+      1161
+    ],
+    "boxes": [
+      [
+        53,
+        27,
+        371,
+        514
+      ],
+      [
+        506,
+        27,
+        370,
+        514
+      ],
+      [
+        972,
+        27,
+        371,
+        514
+      ],
+      [
+        53,
+        602,
+        372,
+        514
+      ],
+      [
+        506,
+        602,
+        370,
+        514
+      ],
+      [
+        972,
+        602,
+        371,
+        514
+      ]
+    ],
+    "touches": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ],
+    "stripSize": [
+      2424,
+      546
+    ]
+  },
+  "running": {
+    "source": "C:\\Users\\18918\\.codex\\generated_images\\01a16c76-a945-7131-a8f9-110d008b419d\\exec-69783307-2992-4495-93d5-5135ca6a4008.png",
+    "sourceSize": [
+      1355,
+      1161
+    ],
+    "boxes": [
+      [
+        42,
+        35,
+        367,
+        513
+      ],
+      [
+        499,
+        35,
+        370,
+        512
+      ],
+      [
+        961,
+        35,
+        369,
+        514
+      ],
+      [
+        42,
+        612,
+        370,
+        509
+      ],
+      [
+        498,
+        607,
+        371,
+        514
+      ],
+      [
+        960,
+        608,
+        369,
+        512
+      ]
+    ],
+    "touches": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ],
+    "stripSize": [
+      2418,
+      546
+    ]
+  },
+  "review": {
+    "source": "C:\\Users\\18918\\.codex\\generated_images\\01a16c76-a945-7131-a8f9-110d008b419d\\exec-76405043-034a-444f-83c0-2a441334ad1c.png",
+    "sourceSize": [
+      1355,
+      1161
+    ],
+    "boxes": [
+      [
+        41,
+        31,
+        375,
+        511
+      ],
+      [
+        508,
+        31,
+        373,
+        511
+      ],
+      [
+        977,
+        31,
+        371,
+        511
+      ],
+      [
+        41,
+        604,
+        375,
+        511
+      ],
+      [
+        507,
+        604,
+        374,
+        511
+      ],
+      [
+        977,
+        604,
+        371,
+        511
+      ]
+    ],
+    "touches": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ],
+    "stripSize": [
+      2442,
+      543
+    ]
+  }
+}

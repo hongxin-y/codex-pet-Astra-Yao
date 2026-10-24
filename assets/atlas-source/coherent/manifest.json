@@ -1,0 +1,91 @@
+{
+  "schema": 2,
+  "cell": [
+    192,
+    208
+  ],
+  "size": [
+    1536,
+    2288
+  ],
+  "rgbaSha256": "3f0bc18369e1b56a1166606a85d1e0e6c13f82616ef5fb0b24a0fa971dc00531",
+  "rows": [
+    {
+      "row": 0,
+      "state": "idle",
+      "frames": 6,
+      "file": "rows/00-idle.png",
+      "sha256": "43b48f0ffc8e752a9ba5cdea5a8d857a2538e35ab014d1a1c923e292446fefc3"
+    },
+    {
+      "row": 1,
+      "state": "running-right",
+      "frames": 8,
+      "file": "rows/01-running-right.png",
+      "sha256": "f0158b2586c34797290b326527e4d43fbcaf0205f23426485c5c1e290b620ab6"
+    },
+    {
+      "row": 2,
+      "state": "running-left",
+      "frames": 8,
+      "file": "rows/02-running-left.png",
+      "sha256": "530eec9ec1b6aba725d69c7fb8d8161cba24b90597ddd305340488e3feb05763"
+    },
+    {
+      "row": 3,
+      "state": "waving",
+      "frames": 4,
+      "file": "rows/03-waving.png",
+      "sha256": "87c5feb2e65cd23e8ccb189f2f163ffd40f2691f96e2ea962d49aee6d702aabb"
+    },
+    {
+      "row": 4,
+      "state": "jumping",
+      "frames": 5,
+      "file": "rows/04-jumping.png",
+      "sha256": "315c3c287d899e9c6cceb344461e2c192767086aa05d53f9912e9a6a310a7b69"
+    },
+    {
+      "row": 5,
+      "state": "failed",
+      "frames": 8,
+      "file": "rows/05-failed.png",
+      "sha256": "3df55cd16775f5ba3977887413f00c11afd1bac11760282a4daaaf759dacc652"
+    },
+    {
+      "row": 6,
+      "state": "waiting",
+      "frames": 6,
+      "file": "rows/06-waiting.png",
+      "sha256": "8d671ed0f2f7794bbfbb73afc4605109b21dc5735b14c3dc99cbcec2184f3192"
+    },
+    {
+      "row": 7,
+      "state": "running",
+      "frames": 6,
+      "file": "rows/07-running.png",
+      "sha256": "9eeea0e984db033d803a6f6e51f2720705bae050d750cde11e3c48090f4eb490"
+    },
+    {
+      "row": 8,
+      "state": "review",
+      "frames": 6,
+      "file": "rows/08-review.png",
+      "sha256": "6a356806f860182e14a3ce26524374cd85fd67ab689635924120dcfbf73c4144"
+    },
+    {
+      "row": 9,
+      "state": "look-row-9",
+      "frames": 8,
+      "file": "rows/09-look-row-9.png",
+      "sha256": "b0039a3a70ad63e460c0e1c6c02fceb5e46772cac73a18b96ef340fa93ffd687"
+    },
+    {
+      "row": 10,
+      "state": "look-row-10",
+      "frames": 8,
+      "file": "rows/10-look-row-10.png",
+      "sha256": "60879624f67bf860c2ac6c3d4a8cf2be4b490bbd9983bc4b54a0a11c99a71953"
+    }
+  ]
+}

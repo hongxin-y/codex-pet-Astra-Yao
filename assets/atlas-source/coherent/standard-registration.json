@@ -1,0 +1,122 @@
+{
+  "failed": {
+    "xTranslation": 12,
+    "yTranslation": 0,
+    "desiredXTranslation": 12,
+    "sourceTorsoCenters": [
+      83.6,
+      83.9,
+      83.7,
+      83.6,
+      83.8,
+      83.7,
+      83.7,
+      84.0
+    ]
+  },
+  "idle": {
+    "xTranslation": 12,
+    "yTranslation": 0,
+    "desiredXTranslation": 12,
+    "sourceTorsoCenters": [
+      84.4,
+      84.4,
+      84.2,
+      84.4,
+      84.4,
+      84.4
+    ]
+  },
+  "jumping": {
+    "xTranslation": 10,
+    "yTranslation": 0,
+    "desiredXTranslation": 10,
+    "sourceTorsoCenters": [
+      84.2,
+      88.6,
+      91.7,
+      85.9,
+      84.3
+    ]
+  },
+  "review": {
+    "xTranslation": 10,
+    "yTranslation": 0,
+    "desiredXTranslation": 10,
+    "sourceTorsoCenters": [
+      86.2,
+      86.1,
+      86.0,
+      85.8,
+      85.7,
+      85.9
+    ]
+  },
+  "running": {
+    "xTranslation": 9,
+    "yTranslation": 0,
+    "desiredXTranslation": 9,
+    "sourceTorsoCenters": [
+      86.1,
+      86.8,
+      86.8,
+      85.4,
+      87.0,
+      86.4
+    ]
+  },
+  "running-left": {
+    "xTranslation": 10,
+    "yTranslation": 0,
+    "desiredXTranslation": 10,
+    "sourceTorsoCenters": [
+      84.9,
+      85.7,
+      85.3,
+      85.4,
+      85.6,
+      85.0,
+      85.6,
+      86.9
+    ]
+  },
+  "running-right": {
+    "xTranslation": -15,
+    "yTranslation": 0,
+    "desiredXTranslation": -19,
+    "sourceTorsoCenters": [
+      114.4,
+      115.3,
+      115.6,
+      113.1,
+      116.5,
+      114.7,
+      114.8,
+      112.9
+    ]
+  },
+  "waiting": {
+    "xTranslation": 10,
+    "yTranslation": 0,
+    "desiredXTranslation": 10,
+    "sourceTorsoCenters": [
+      85.8,
+      86.3,
+      87.0,
+      86.3,
+      86.4,
+      85.7
+    ]
+  },
+  "waving": {
+    "xTranslation": 12,
+    "yTranslation": 0,
+    "desiredXTranslation": 12,
+    "sourceTorsoCenters": [
+      84.0,
+      84.4,
+      84.5,
+      86.8
+    ]
+  }
+}

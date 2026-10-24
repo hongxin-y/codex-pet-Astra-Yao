@@ -1,10 +1,11 @@
 # 图集 imagegen 源图与提示词记录
 
-使用内置 imagegen；没有调用 CLI/API 后备路径。所有选用的图片都是完整角色帧，不再把头、手或道具从不同图片上拼贴到待机母版。
-左右跑步分别生成，法杖都留在画面左侧；工作行从左跑相位抽取 6 帧。第 9–10 行为屏幕坐标下顺时针完整 360° 视线环绕，不是全身转一圈，也不是左右 180° 扫视。
-生成器未精确返回请求尺寸；下表的网格布局由 `scripts/pack-atlas.mjs` 显式指定后重建。
+2026-10-25 修复版使用内置 imagegen；没有调用 CLI/API 后备路径。当前源图、提示词与归档摘要见
+[`coherent/generation.json`](../assets/atlas-source/coherent/generation.json)，固定格条带及哈希见
+[`coherent/manifest.json`](../assets/atlas-source/coherent/manifest.json)。工作行已改为独立站立工作动作。
+正式打包不再使用下方的旧规则网格，也不再逐帧缩放或局部拼贴。详见 [复核记录](atlas-review.md)。
 
-## 当前源图与取帧布局
+## 旧版源图与取帧布局（历史记录，不再用于构建）
 
 - `normalized/idle.png`：7 格；运行时使用前 6 格。
 - `normalized/run.png`：8 格向左跑步；第 7 行从相位 `[0,1,3,4,5,7]` 取 6 格。

@@ -1,0 +1,70 @@
+{
+  "ok": true,
+  "atlas": "D:\\Repos\\pet-astra-yao\\spritesheet.webp",
+  "encoded_bytes": 2672038,
+  "sha256": "340bae6403c351960f3d0736994dfbc93b3b2521acfd31cfa2d816ab4e0ae1e4",
+  "jump": {
+    "idle_baseline": 202,
+    "jump_baselines": [
+      202,
+      193,
+      182,
+      189,
+      202
+    ],
+    "airborne_lift_pixels": 20,
+    "landing_delta_pixels": 0
+  },
+  "look_registration": {
+    "neutral_center_x": 107.5,
+    "look_centers_x": [
+      108.0,
+      107.5,
+      107.5,
+      107.5,
+      108.5,
+      108.5,
+      108.5,
+      108.5,
+      109.0,
+      108.0,
+      108.0,
+      108.0,
+      108.0,
+      107.5,
+      108.5,
+      106.0
+    ],
+    "look_widths": [
+      142,
+      143,
+      143,
+      143,
+      143,
+      143,
+      143,
+      143,
+      148,
+      148,
+      148,
+      148,
+      148,
+      149,
+      151,
+      152
+    ],
+    "maximum_center_drift_pixels": 1.5,
+    "maximum_width_ratio": 1.0704225352112675
+  },
+  "errors": [],
+  "warnings": [
+    "look direction 022.5 accepted with a reviewed warning",
+    "look direction 045 accepted with a reviewed warning",
+    "look direction 067.5 accepted with a reviewed warning",
+    "look direction 247.5 accepted with a reviewed warning",
+    "look direction 337.5 accepted with a reviewed warning",
+    "067.5->090 diff is a local outlier (1670 pixels vs neighbor average 970)",
+    "157.5->180 diff is a local outlier (1766 pixels vs neighbor average 1087)",
+    "337.5->000 diff is a local outlier (3586 pixels vs neighbor average 1936)"
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "reviewer": "primary agent, labeled native-cell and fixed-crop visual review",
+  "independent_review": "unavailable: all three blind-review workers stopped at account usage limit; no independent pass claimed",
+  "directions": [
+    {"label":"000","expected":"up","observed":"up","verdict":"pass","evidence":"Both eyes aim above the face center; chin lifted and face surface tilts upward."},
+    {"label":"022.5","expected":"up-right","observed":"up-right","verdict":"warning","evidence":"Nose and eyes turn screen right, away from staff; chin raised. Similar to 045 and 067.5 at native size."},
+    {"label":"045","expected":"up-right","observed":"up-right","verdict":"warning","evidence":"Nose is right of face center, lifted chin and upper-right gaze; neighboring angles have subtle separation."},
+    {"label":"067.5","expected":"up-right","observed":"up-right","verdict":"warning","evidence":"Rightward nose/eye orientation with modest upward chin pitch; vertical component is subtle."},
+    {"label":"090","expected":"right","observed":"right","verdict":"pass","evidence":"Face nose projects toward right edge; eye surface and gaze aim horizontally away from staff."},
+    {"label":"112.5","expected":"down-right","observed":"down-right","verdict":"pass","evidence":"Eyes and nose remain rightward while chin lowers and upper lids descend."},
+    {"label":"135","expected":"down-right","observed":"down-right","verdict":"pass","evidence":"Rightward nose offset with lower chin and gaze below eye center; both axes visible."},
+    {"label":"157.5","expected":"down-right","observed":"down-right","verdict":"pass","evidence":"Chin tucked, open eyes aim downward, face retains small screen-right offset."},
+    {"label":"180","expected":"down","observed":"down","verdict":"pass","evidence":"Centered face, tucked chin and lowered open eyes; neither a back view nor a blink."},
+    {"label":"202.5","expected":"down-left","observed":"down-left","verdict":"pass","evidence":"Tucked chin and low eyes with a slight turn toward screen-left staff."},
+    {"label":"225","expected":"down-left","observed":"down-left","verdict":"pass","evidence":"Nose/face angle toward staff and lowered chin, both left and down components readable."},
+    {"label":"247.5","expected":"down-left","observed":"down-left","verdict":"warning","evidence":"Face and gaze leftward with shallow downward pitch; vertical component is subtle."},
+    {"label":"270","expected":"left","observed":"left","verdict":"pass","evidence":"Nose profile and visible near eye point horizontally toward the screen-left staff."},
+    {"label":"292.5","expected":"up-left","observed":"up-left","verdict":"pass","evidence":"Leftward nose and raised chin; visible eye aims above staff-side horizon."},
+    {"label":"315","expected":"up-left","observed":"up-left","verdict":"pass","evidence":"Both eyes visible as head returns toward frontal; nose retains leftward angle and chin stays lifted."},
+    {"label":"337.5","expected":"up-left","observed":"up-left","verdict":"warning","evidence":"Near-frontal upward face with slight left bias. Boundary to 000 retains a visible hair/face projection change; no whole-body scale transform is used."}
+  ],
+  "continuity_review": {
+    "067.5->090":"Head lowers from upper-right to horizontal right. Feet and staff stay anchored; one-pixel silhouette center change.",
+    "157.5->180":"Face moves from down-right to centered down. Lower body remains planted; generation texture differs slightly across source groups.",
+    "337.5->000":"Frontal-up closure improved by regenerating row 10; residual hair/face outline change and about 2 pixels silhouette-center change remain. Flagged for user inspection, not described as seamless."
+  }
+}

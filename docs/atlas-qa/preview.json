@@ -1,0 +1,45 @@
+{
+  "atlasSha256": "340bae6403c351960f3d0736994dfbc93b3b2521acfd31cfa2d816ab4e0ae1e4",
+  "cropCoordinates": {
+    "head": [
+      61,
+      12,
+      142,
+      92
+    ],
+    "torso": [
+      63,
+      86,
+      140,
+      148
+    ],
+    "legs": [
+      74,
+      137,
+      123,
+      205
+    ],
+    "staff": [
+      33,
+      4,
+      74,
+      195
+    ]
+  },
+  "frameSize": [
+    192,
+    208
+  ],
+  "fitting": "none",
+  "intervalsMs": {
+    "idle": 160,
+    "running-right": 120,
+    "running-left": 120,
+    "waving": 200,
+    "jumping": 140,
+    "failed": 140,
+    "waiting": 150,
+    "running": 120,
+    "review": 360
+  }
+}

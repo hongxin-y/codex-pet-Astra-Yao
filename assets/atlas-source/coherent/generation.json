@@ -1,0 +1,71 @@
+{
+  "generator": "built-in image_gen; retained idle/run sources noted per job",
+  "jobs": {
+    "waving": {
+      "row": 3,
+      "prompt": "Edit target: image 1 contains FOUR copies of the approved Astra Yao master in a 2x2 layout. Image 2 is the exact full-body master at native resolution. Produce an edited 2x2 layout. In every copy change ONLY her free arm on SCREEN RIGHT to wave: frame 1 open palm raised by her shoulder; frame 2 palm angled gently outward; frame 3 palm angled gently inward; frame 4 relaxed open palm. Preserve all pixels and scale outside this arm region as closely as possible, including the complete full-length gold microphone staff from top crystal to bottom crystal, head shape and size, white headband, face and chin height, neck, chest, narrow waist, waist star position, skirt hem, pearl thigh band, long bare legs, small heels, and flowing teal hair. The wave is small, elbow near the waist. Keep her torso upright, face forward and feet planted exactly like the master. Only TWO arms total: erase the old lowered free hand when raising it. Same game sprite texture and outline thickness, not a new cartoon or smooth illustration. Keep the exact same canvas and four equally sized cells with identical figure scale and ground baselines. All four full figures complete with transparent gutters. Pure transparent background. No effects, text, labels, grids, shadow or background.",
+      "source": "assets/atlas-source/coherent/raw/waving.png",
+      "sha256": "7d98b4a0f9e8e00b87e25b82ac2a7a46fe2f13d3527bf0b2f885b81d1ea64e47"
+    },
+    "failed": {
+      "row": 5,
+      "prompt": "Edit target: image 1 is a 4 column by 2 row layout containing 8 exact copies of the approved character. Image 2 is the definitive full-body Astra Yao sprite. Edit these copies into 8 consecutive frames of ONE coherent failed loop, in reading order. Action: A restrained disappointed sigh: eyes soften and lower, then a short blink, the mouth makes a small unhappy curve, the free hand rests against the chest for the middle poses and relaxes again. Keep her head at essentially the same height; no bending, crouching or shrinking. Preserve master pixels, scale and placement wherever the action does not require change. Lock the exact face construction, head width, chin height, neck, chest, narrow waist, gold waist-star height, skirt hem, pearl thigh band, long bare legs, small high-heel shoes, flowing teal hair, and complete long gold microphone staff from top crystal to bottom tip. Keep the prop in the same hand on screen left, same length, and feet on the same baseline. Only TWO arms; gestures remain attached naturally. Preserve the original small game-sprite texture and outline; do not smooth, redesign, shorten legs, enlarge shoes or change the head/body ratio. Keep full-body poses inside separated invisible cells on transparent background, safe clear gutters. No effects, detached marks, labels, grid, shadow, background or additional props.",
+      "source": "assets/atlas-source/coherent/raw/failed.png",
+      "sha256": "61d4bf66b835c12ca3d1d201971969223d70b89dc9f6d4233ba14661f5338eed"
+    },
+    "waiting": {
+      "row": 6,
+      "prompt": "Edit target: image 1 is a 3 column by 2 row layout containing 6 exact copies of the approved character. Image 2 is the definitive full-body Astra Yao sprite. Edit these copies into 6 consecutive frames of ONE coherent waiting loop, in reading order. Action: Waiting expectantly for approval: free hand on screen right turns palm up at waist level in a small asking gesture, eyes glance toward the viewer, one brief blink, hand relaxes slightly. Clearly expectant, no waving. Preserve master pixels, scale and placement wherever the action does not require change. Lock the exact face construction, head width, chin height, neck, chest, narrow waist, gold waist-star height, skirt hem, pearl thigh band, long bare legs, small high-heel shoes, flowing teal hair, and complete long gold microphone staff from top crystal to bottom tip. Keep the prop in the same hand on screen left, same length, and feet on the same baseline. Only TWO arms; gestures remain attached naturally. Preserve the original small game-sprite texture and outline; do not smooth, redesign, shorten legs, enlarge shoes or change the head/body ratio. Keep full-body poses inside separated invisible cells on transparent background, safe clear gutters. No effects, detached marks, labels, grid, shadow, background or additional props.",
+      "source": "assets/atlas-source/coherent/raw/waiting.png",
+      "sha256": "c55f2e2c2fab9f5437e45154b82631c28eca21de2704b66d7b95399df8f687d6"
+    },
+    "review": {
+      "row": 8,
+      "prompt": "Edit target: image 1 is a 3 column by 2 row layout containing 6 exact copies of the approved character. Image 2 is the definitive full-body Astra Yao sprite. Edit these copies into 6 consecutive frames of ONE coherent review loop, in reading order. Action: Inspecting work thoughtfully: free hand on screen right lightly touches her chin, eyes scan slightly left then right, one brief blink. Keep the same head size and torso position, no head bow or repeated nod. Preserve master pixels, scale and placement wherever the action does not require change. Lock the exact face construction, head width, chin height, neck, chest, narrow waist, gold waist-star height, skirt hem, pearl thigh band, long bare legs, small high-heel shoes, flowing teal hair, and complete long gold microphone staff from top crystal to bottom tip. Keep the prop in the same hand on screen left, same length, and feet on the same baseline. Only TWO arms; gestures remain attached naturally. Preserve the original small game-sprite texture and outline; do not smooth, redesign, shorten legs, enlarge shoes or change the head/body ratio. Keep full-body poses inside separated invisible cells on transparent background, safe clear gutters. No effects, detached marks, labels, grid, shadow, background or additional props.",
+      "source": "assets/atlas-source/coherent/raw/review.png",
+      "sha256": "2aec08cb5fdd62824bbc6bf779c65bcc5a47c8884c2b9d59c3d2b74f021c3b2f"
+    },
+    "running": {
+      "row": 7,
+      "prompt": "Use case: identity-preserve sprite animation edit. Image 1 supplies 6 copies in a 3x2 layout; image 2 is the exact approved full-body character. Create 6 full-body running frames in that reading-order layout, altering only what the action requires. Action: Focused ACTIVE WORK, not running on feet. Standing firmly, she concentrates and makes small deliberate finger-counting/tapping gestures with her free hand near her chest, eyes following the hand then looking thoughtfully forward. Six subtle consecutive phases, one blink. Feet remain planted. No extra object or floating mark. Lock this exact character's face, head/body ratio, narrow white bodice, gold waist star, skirt length, long bare legs, small heels, thigh pearls, red sleeves, gold hair accessory and long dark teal hair. Match the reference game sprite's pixel texture, shading and outline thickness. Keep one shared scale in all cells, full complete attached body and prop, and generous transparent gutters. Do not crop, squash, stretch, redesign, shorten the staff or enlarge the shoes. Transparent background, no text/labels/grid, no floor/shadow/effects/trails, no detached marks or new props.",
+      "source": "assets/atlas-source/coherent/raw/running.png",
+      "sha256": "ff3e1fd9227a1ad75005a15016851a231655d02daae4f50cb82d5c2a47fb5ea1"
+    },
+    "running-right": {
+      "origin": "retained original artwork; complete component extraction",
+      "source": "assets/atlas-source/coherent/raw/running-right.png",
+      "sha256": "e39ad229812c232928b9953f0ea98d9b9ce58962afb4159cc03ad3e4b54c7d1c"
+    },
+    "jumping": {
+      "row": 4,
+      "prompt": "Archived instruction summary: edit five copies of the complete idle mother into a SMALL hop with anticipation, ascent, apex, descent, landing; preserve master head, torso, leg and staff proportions; reserve transparent sixth slot. Replaced the earlier high-jump candidate that required excessive cell shrinkage.",
+      "source": "assets/atlas-source/coherent/raw/jumping.png",
+      "sha256": "167d7757b136de861f93988ad2d356ea97af29fc77ace435b9156f0d83c3418b"
+    },
+    "running-left": {
+      "origin": "retained original artwork; complete component extraction",
+      "source": "assets/atlas-source/coherent/raw/running-left.png",
+      "sha256": "e84b35c3ec0e5e9c67725517541f02645fe2d7a05aecba444bd3d3fb2264794f"
+    },
+    "idle": {
+      "origin": "complete master component and its blink; sequence 0,0,1,0,0,0",
+      "source": "assets/atlas-source/coherent/raw/idle.png",
+      "sha256": "31546f3cdf6964123955a0955156795660de9bb8c690b8a9014bbe74396a58ee"
+    },
+    "look-row-9": {
+      "source": "assets/atlas-source/coherent/raw/look-row-9.png",
+      "sha256": "6e24e4672e94696bdf90a9558cab661923406df8ca4e46772c4db9f56c42731d",
+      "prompt": "Archived instruction summary: edit the cardinal-based 4x2 layout into UP, UP-RIGHT (three intermediate steps), RIGHT, DOWN-RIGHT (three steps). Screen-right means away from the left-side staff. Preserve anchored hips, legs, shoes, staff and shared character scale. Eight complete separated poses, transparent background, no effects."
+    },
+    "look-row-10": {
+      "source": "assets/atlas-source/coherent/raw/look-row-10.png",
+      "sha256": "758fcafe188b192442f2489a0eaef0a714c40510a2950422cb640535e4419c56",
+      "prompt": "Edit the supplied complete 4x2 eight-frame gaze sprite sheet, preserving exact character physical scale, body, legs, feet, skirt, hair volume and full staff in all 8 poses. Keep same 1704x923 layout, true transparent background. These are gaze angles 180,202.5,225,247.5,270,292.5,315,337.5 clockwise, screen coordinates. First 5 poses DOWN through LEFT are correct, keep them. Fix the LAST THREE poses into a smooth transition back to FRONT-FACING UP. Bottom row left-to-right should be: LEFT with nose facing left; LEFT-UP with moderately left-facing head and chin raised; UP-LEFT with only a small leftward head turn and BOTH EYES clearly visible; nearly STRAIGHT UP with face almost symmetrical/frontal, nose centered between eyes, eyes looking slightly up-left and chin raised. CRITICAL: LAST POSE must no longer be a strong side/three-quarter head turned to the staff. It should almost match the frontal-up first pose of the second reference, with just a SMALL leftward component. Progressively bring nose and mouth back to the facial center in the last 3 poses while lifting chin. Keep skull physical volume, no head/body resizing. Subtle continuous connected neck/shoulder following, anchored hips, shoes and staff; same pixel-art details and exact long bare legs, small shoes, waist and skirt positions. No back view, no fullbody spin, no marks/text/shadow/guide. Second reference is start-of-next-row UP pose for closing the loop, preserve its head direction but do not copy its strip layout.\n"
+    },
+    "cardinals": {
+      "source": "assets/atlas-source/coherent/raw/cardinals.png",
+      "sha256": "37dff39ff821fa37b834150cf2e38be838a584df80ab5f024d63c7a87fbdebf6",
+      "prompt": "Archived instruction summary: four full-body cursor gaze anchors UP, RIGHT, DOWN, LEFT. Preserve complete idle mother body and leg proportions, planted feet, long staff and clothing. Head leads with natural connected neck/shoulder follow-through, open eyes in downward gaze."
+    }
+  }
+}

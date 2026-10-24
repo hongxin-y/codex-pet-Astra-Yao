@@ -221,10 +221,12 @@ pnpm 会拉仓库、跑 `prepare` 重新生成 `lib/client.js`。这样装的是
 
 ```powershell
 npm run build     # 改完 src/client.core.js 后重新生成 lib/client.js
-npm run build:atlas # 从已审阅的动作源图重新打包图集（开发依赖 sharp）
+npm run build:atlas # 原样打包已审阅的固定格素材（Python + Pillow）
 npm run verify    # 自检：清单字段、补丁行、bundle、图集尺寸（1536×2288 / v2）
 npm test          # node:test：atlas / config / state / balance / client / host / server
 npm run test:atlas # Pillow：图集审计脚本的回归用例
+python -B test/pack_atlas_test.py # 编码像素不变、异常时保留旧图集
+python scripts/preview-atlas.py # 从正式 WebP 生成逐帧预览与母版固定裁块
 
 # 换图集之后先跑这个（需要 Pillow）：格式、透明度、连续帧数、含道具的占用边界
 python scripts/audit-atlas.py spritesheet.webp
@@ -251,21 +253,22 @@ python scripts/audit-atlas.py spritesheet.webp
 本仓库只做桌宠资源的整理与 DSH 插件化，未附带额外许可证。
 
 图集原先存在跑动混跪姿、失败突然躺平、挥手换画、跨行比例变化和方向帧语义不完整等问题。
-2026-10 的重绘后，`python scripts/audit-atlas.py spritesheet.webp` 结构性检查全部通过
-（站立帧高约 198 px、脚底基线 203、方向两行中位高度 198/198 px、16 向面部像素变化 73%），Codex 直接使用图片时也能得到修好的动作：
+2026-10 的修复恢复了源图完整鞋底，重画挥手、跳跃、失败、等待、工作、检查与注视组。
+打包器直接复制已审阅的固定格，不再重新定位、缩放或拼贴身体局部。
+结构检查与最终质量检查通过；方向过渡仍有人工复核提示，详见[复查记录](docs/atlas-review.md)和[交互预览](docs/atlas-qa/review.html)。
 
 | 位置 | 当前状态 | 播放 |
 | --- | --- | --- |
 | 第 1 行（向右跑） | 独立生成的向右跑全身帧；法杖仍固定在画面左侧 | 原生第 1 行，8 帧；不再额外 `flip` |
 | 第 5 行（failed） | 完整全身站立低落、叹气，无躺平或局部拼贴 | 完整 8 帧，不跳过任何一列 |
-| 第 7 行（工作中） | 复用第 2 行的 6 个不同跑步相位 `[0,1,3,4,5,7]` | 6 帧，120 ms |
+| 第 7 行（工作中） | 站立专注、手指计数与思考，保持母版比例 | 6 帧，120 ms |
 | 第 8 行（review） | 完整全身托腮思考，保持站姿，细微目光变化和眨眼 | 完整 6 帧，360 ms |
 | 第 3 行（挥手） | 完整全身连续挥手，法杖固定在画面左侧，脚底对齐 | 单击播完整 4 帧，200 ms |
 | 第 9–10 行（16 朝向） | 360° 屏幕方向注视：上 → 右 → 下 → 左；头颈和上身自然跟随，下身与脚底稳定 | 默认跟随光标（280 px 内），每 22.5° 一格，2.5° 迟滞，可关闭 |
 
-新绘动作使用内置 imagegen，提示词保存在 [`docs/atlas-generation-prompts.md`](docs/atlas-generation-prompts.md)，
-源图位于 `assets/atlas-source/`，由 `scripts/pack-atlas.mjs` 统一重建全部 11 行后输出 lossless WebP；
-各姿势不单独拉伸，也不裁切人物。
+新绘动作使用内置 imagegen，本轮源图、提示词记录和已注册的 11 行位于
+[`assets/atlas-source/coherent/`](assets/atlas-source/coherent/)。`scripts/pack-atlas.mjs` 调用 Python/Pillow
+打包，逐行检查审阅哈希，并验证无损编码前后所有 RGBA 像素一致。更换源图后必须重新提取、审阅和更新清单。
 
 判定标准写在 [`docs/atlas-brief.md`](docs/atlas-brief.md)：跨行动作共用同一人物设定，持杖手固定在画面左侧；16 格方向按屏幕坐标顺时针环绕，四个主方向不能反转。`python scripts/audit-atlas.py spritesheet.webp`
 会打印各行高度、宽度、基线、方向两行高度差及面部区域变化；客户端使用 2.5° 边界迟滞，避免在格子边界来回闪。
