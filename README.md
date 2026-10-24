@@ -11,6 +11,18 @@ DeepSeek Harness（DSH）可以识别的插件：装进 profile 之后，Astra Y
 - 形态：一个标准的 DSH 插件包（`package.json` 里的 `dsh.bundle` + `dsh.client`），
   服务端一半负责会话状态与 HTTP 接口，浏览器一半负责把 sprite 画到页面上
 
+## 两个身份
+
+这个仓库同时是两样东西，互不干扰：
+
+| 你是谁 | 怎么用 | 需要的文件 |
+| --- | --- | --- |
+| DSH 用户 | `dsh plugin --profile desktop add <本仓库路径>`（见下文「安装」） | `package.json`、`cordis.patch.yml`、`src/`、`lib/` |
+| Codex 用户 | 把仓库里的 `pet.json` + `spritesheet.webp` 复制到 `%USERPROFILE%\.codex\pets\astra-yao\`（见 [USAGE.md](USAGE.md)） | 仍然只有 `pet.json` + `spritesheet.webp` |
+
+Codex 只认这两个文件，所以 DSH 那套 `package.json`、`src/`、`test/` 放在同一层不影响它；
+反过来，DSH 的 sprite 也直接读根目录的 `spritesheet.webp`，没有第二份拷贝。
+
 > **English:** Astra Yao is a Codex v2 sprite-atlas pet for the DeepSeek Harness web GUI. One 1536×2288
 > atlas (8×11 frames of 192×208) drives nine animations; the server half follows session events, so the pet
 > idles, thinks, runs while tools are working and waits on approvals. The browser half paints it in a
