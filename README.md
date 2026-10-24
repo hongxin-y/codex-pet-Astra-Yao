@@ -33,7 +33,9 @@ pet-astra-yao/
 |   `-- client.core.js    # 浏览器端源码（影子 DOM、拖拽、气泡、右键菜单、轮询）
 |-- scripts/
 |   |-- build-client.mjs  # 把 client.core.js 打包成 lib/client.js
-|   `-- verify.mjs        # 安装前自检：清单、补丁、bundle、atlas
+|   |-- verify.mjs        # 安装前自检：清单、补丁、bundle、atlas
+|   `-- audit-atlas.py    # 图集体检：帧数、行内高度、脚底基线（Pillow）
+|-- docs/atlas-brief.md   # 给画图方的重制需求：现状问题 + 一致性规则 + 验收
 |-- lib/client.js         # 构建产物（已提交，DSH 启动时直接加载）
 |-- test/                 # node:test 单测（atlas / state / config / balance / client / host / server）
 |-- assets/icon-180.png   # 插件市场图标（从图集待机帧裁出来）
@@ -174,11 +176,17 @@ pnpm 会拉仓库、跑 `prepare` 重新生成 `lib/client.js`。这样装的是
 ```powershell
 npm run build     # 改完 src/client.core.js 后重新生成 lib/client.js
 npm run verify    # 自检：清单字段、补丁行、bundle、图集尺寸（1536×2288 / v2）
-npm test          # node:test：atlas / config / state / balance / client / host / server 共 61 个用例
+npm test          # node:test：atlas / config / state / balance / client / host / server 共 64 个用例
+
+# 换图集之后先跑这个（需要 Pillow）：帧数、行内角色高度、脚底基线、头部密度
+python scripts/audit-atlas.py spritesheet.webp
 ```
 
 `lib/client.js` 是提交进仓库的构建产物：DSH 启动时直接读它，不会帮你编译，所以改完源码记得 `npm run build`
 再一起提交。
+
+要重新生成图集，把 [`docs/atlas-brief.md`](docs/atlas-brief.md) 直接发给画图方：里面写了交付规格、
+11 行各自该画什么、现有图集的实测缺陷（带格子坐标），以及本脚本的验收标准（输出 `OK` 才算过）。
 
 自己写桌宠时可以直接复用 `src/atlas.js`：它只描述 Codex atlas 的几何与动画表（行、帧数、间隔、朝向），
 不碰 DOM，也没有依赖。
