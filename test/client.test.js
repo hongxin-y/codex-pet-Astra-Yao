@@ -673,32 +673,36 @@ test('thinking plays six repaired poses at a calm cadence and wraps', async () =
   assert.deepEqual(seen, ['-288px -1248px', '-432px -1248px', '-576px -1248px', '-720px -1248px', '0px -1248px'])
 })
 
-test('pointer look remains opt-in and limited to a nearby cursor', async () => {
+test('pointer look follows a nearby cursor and can be switched off', async () => {
   const { env } = applyWidget()
   const sprite = env.body.children[0]._shadow.querySelector('.sprite')
   const session = { active: true, sessionId: 's1', state: 'idle', activity: '', pulse: null, title: null, project: null }
   await feed(env, session)
   env.pump(0)
 
-  // Default config keeps lookAtPointer off, so a nearby cursor changes nothing.
-  env.fireWindow('pointermove', { clientX: 72 + 100, clientY: 78 })
-  env.pump(0)
-  assert.match(sprite.style.backgroundPosition, / 0px$/u, 'the idle row keeps playing by default')
-
-  // Turning it on brings the look cells back, still limited to a 280 px radius.
-  await feed(env, session, { lookAtPointer: true })
-  env.fireWindow('pointermove', { clientX: 72 + 400, clientY: 78 })
-  env.pump(200)
-  assert.equal(sprite.style.backgroundPosition, '-144px 0px', 'idle keeps animating when the cursor is far')
-
+  // On by default: a cursor inside the 280 px radius turns the pet toward it.
+  env.advanceClock(120) // pointer look throttles at 60 ms
   env.fireWindow('pointermove', { clientX: 72 + 120, clientY: 78 })
   env.pump(0)
   assert.equal(sprite.style.backgroundPosition, '-576px -1404px', 'a nearby cursor shows the look-right cell')
 
+  // The glance relaxes back into the idle loop after a couple of seconds.
+  env.advanceClock(2600)
+  env.pump(0)
+  assert.match(sprite.style.backgroundPosition, / 0px$/u, 'a parked cursor relaxes back into idle')
+
+  // Outside the radius the idle loop comes back.
   env.advanceClock(120)
   env.fireWindow('pointermove', { clientX: 72 + 400, clientY: 78 })
   env.pump(0)
-  assert.match(sprite.style.backgroundPosition, / 0px$/u, 'the idle row comes back once the cursor leaves')
+  assert.match(sprite.style.backgroundPosition, / 0px$/u, 'idle resumes once the cursor leaves the radius')
+
+  // { lookAtPointer: false } ignores the pointer completely.
+  await feed(env, session, { lookAtPointer: false })
+  env.advanceClock(120)
+  env.fireWindow('pointermove', { clientX: 72 + 120, clientY: 78 })
+  env.pump(0)
+  assert.match(sprite.style.backgroundPosition, / 0px$/u, 'switching it off keeps the idle row')
 })
 
 // ---------------------------------------------------------------------------

@@ -26,8 +26,8 @@ Codex 只认这两个文件，所以 DSH 那套 `package.json`、`src/`、`test/
 > **English:** Astra Yao is a Codex v2 sprite-atlas pet for the DeepSeek Harness web GUI. One 1536×2288
 > atlas (8×11 frames of 192×208) drives nine animations; the server half follows session events, so the pet
 > idles, thinks, runs while tools are working and waits on approvals. The browser half paints it in a
-> shadow-root widget with drag-to-move, a status bubble, a right-click menu and an optional pointer-look
-> mode. The bubble keeps a stage-flavoured status line and rotates backstage quips while the pet is idle,
+> shadow-root widget with drag-to-move, a status bubble, a right-click menu and pointer-look that follows a
+> nearby cursor. The bubble keeps a stage-flavoured status line and rotates backstage quips while the pet is idle,
 > and can also show the DeepSeek account balance and today's spend.
 > Install with `dsh plugin --profile desktop add <path-to-this-repo>`.
 
@@ -110,7 +110,7 @@ pnpm 会拉仓库、跑 `prepare` 重新生成 `lib/client.js`。这样装的是
 | 单击 | 戳一下：挥手；若当前是报错状态，则点一下即「我知道了」，回到待机 |
 | 右键 | 打开菜单：显示桌宠、大小、不透明度、动画速度、锁定位置、左右镜像、跟随光标、状态气泡、显示余额、回右下角、我知道了 |
 | 隐藏后 | 右下角留一个小圆点，点它把桌宠叫回来 |
-| 鼠标移动 | 默认关闭（见 `lookAtPointer`）。打开后：待机时、且光标距离桌宠 280 px 以内，才看向光标（图集第 9–10 行的 16 个朝向） |
+| 鼠标移动 | 待机时、且光标距离桌宠 280 px 以内，看向光标（图集第 9–10 行的 16 个朝向）；光标停住约 2.5 秒或离开范围后回到待机动画。可在菜单里关掉「跟随光标」 |
 
 状态在「思考 ↔ 执行」之间抖动时，动画不会跟着一秒一重启：升级（执行、等待、报错）立刻切换，
 回落要等当前动作播满 1.5 秒，所以小跑会连续跑下去，而不是原地抽动。
@@ -167,7 +167,7 @@ pnpm 会拉仓库、跑 `prepare` 重新生成 `lib/client.js`。这样装的是
 | `opacity` | `1` | 不透明度，0.3–1 |
 | `speed` | `1` | 动画速度，0.5–1.6（0.5 最慢，1.6 最快） |
 | `mirror` | `false` | 左右镜像 |
-| `lookAtPointer` | `false` | 光标靠近时看向光标；保持默认关闭，可在菜单中开启。新版朝向帧已统一比例，头眼转向幅度较轻 |
+| `lookAtPointer` | `true` | 光标靠近时看向光标；新版朝向帧已统一比例，可在菜单里关掉 |
 | `locked` | `false` | 锁定位置，禁止拖动 |
 | `hidden` | `false` | 隐藏（留一个小圆点） |
 | `paused` | `false` | 暂停逐帧动画，只画当前帧 |
@@ -238,7 +238,7 @@ python scripts/audit-atlas.py spritesheet.webp
 | 第 5 行（failed） | 整行重绘为站立低落、叹气，消除站立/跪坐/躺平混杂 | 完整 8 帧，不跳过第 5 列 |
 | 第 7 行（工作中） | 复用第 2 行的 6 个不同跑步相位 `[0,1,3,4,5,7]` | 6 帧，120 ms |
 | 第 8 行（review） | 整行统一为抬头托腮、目光变化和眨眼 | 完整 6 帧，360 ms |
-| 第 9–10 行（16 朝向） | 按母版比例重新生成站立注视姿势，头眼变化较轻 | `lookAtPointer` 继续默认关闭，可选开启 |
+| 第 9–10 行（16 朝向） | 按母版比例重新生成站立注视姿势，头眼变化较轻 | 默认跟随光标（280 px 内），可关闭 |
 
 第 0、2、3、4、6 行保留原有可见像素。新绘动作使用内置 imagegen，
 提示词保存在 [`docs/atlas-generation-prompts.md`](docs/atlas-generation-prompts.md)，

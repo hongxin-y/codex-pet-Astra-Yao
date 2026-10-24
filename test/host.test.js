@@ -415,7 +415,7 @@ test('normalizeConfig defaults used by the host are the shipped defaults', () =>
     paused: false,
     showBubble: true,
     showBubbleUsage: false,
-    lookAtPointer: false,
+    lookAtPointer: true,
     includeSubagents: false,
     posX: null,
     posY: null,
