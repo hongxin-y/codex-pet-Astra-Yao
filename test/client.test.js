@@ -788,7 +788,7 @@ test('the bubble drops below the pet when there is no room above', async () => {
   assert.equal(bubble.style.left, '400px')
 })
 
-﻿test('a click waves with two raised-palm cells instead of four scattered hands', () => {
+﻿﻿test('a click waves with the two cells on her left side, never the staff side', () => {
   const { env } = applyWidget()
   const shadow = env.body.children[0]._shadow
   const pet = shadow.querySelector('.pet')
@@ -798,17 +798,17 @@ test('the bubble drops below the pet when there is no room above', async () => {
   pet.dispatch('pointerdown', { button: 0, pointerId: 1, clientX: 200, clientY: 200, preventDefault() {} })
   env.fireWindow('pointerup', { pointerId: 1 })
   env.pump(0)
-  assert.equal(sprite.style.backgroundPosition, '-144px -468px', 'the wave starts on the raised-palm cell')
+  assert.equal(sprite.style.backgroundPosition, '-288px -468px', 'the wave starts on the raised palm of her free hand')
 
-  env.pump(240)
-  assert.equal(sprite.style.backgroundPosition, '-288px -468px', 'then the higher palm')
-  env.pump(240)
-  assert.equal(sprite.style.backgroundPosition, '-144px -468px', 'and comes back down')
-  env.pump(240)
-  assert.equal(sprite.style.backgroundPosition, '-144px 0px', 'then the idle loop resumes')
+  env.pump(220)
+  assert.equal(sprite.style.backgroundPosition, '-432px -468px', 'then the raised fist')
+  env.pump(220)
+  assert.equal(sprite.style.backgroundPosition, '-288px -468px', 'and back to the palm')
+  env.pump(220)
+  assert.ok(sprite.style.backgroundPosition.endsWith(' 0px'), 'then the idle loop resumes on row 0')
 })
 
-test('the wave never paints the hip or fist cells of the waving row', () => {
+test('the wave never paints the hip or the staff-side palm of the waving row', () => {
   const { env } = applyWidget()
   const shadow = env.body.children[0]._shadow
   const pet = shadow.querySelector('.pet')
@@ -818,9 +818,9 @@ test('the wave never paints the hip or fist cells of the waving row', () => {
   env.fireWindow('pointerup', { pointerId: 1 })
   const seen = new Set()
   for (let step = 0; step < 8; step += 1) {
-    env.pump(120)
+    env.pump(110)
     seen.add(sprite.style.backgroundPosition)
   }
   assert.equal(seen.has('0px -468px'), false, 'cell 0 (hand at the hip) must not be played')
-  assert.equal(seen.has('-432px -468px'), false, 'cell 3 (raised fist) must not be played')
+  assert.equal(seen.has('-144px -468px'), false, 'cell 1 draws the second right hand next to the staff')
 })

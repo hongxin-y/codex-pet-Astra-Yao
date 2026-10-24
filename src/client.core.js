@@ -29,12 +29,13 @@ const LOOK_CELLS = ATLAS.lookCells
  * Client-only derivations of the shared atlas.
  *
  * The waving row carries four poses whose free hand jumps hip -> shoulder ->
- * overhead -> fist. Playing all four in a row reads as "several hands at once",
- * so the poke answer only uses the two raised-palm cells and comes back down to
- * the first of them: a wave that stays in one place.
+ * overhead -> fist, and its second cell draws the raised palm on the *staff*
+ * side, so she ends up with two right hands. The poke answer therefore only
+ * uses cells 2 and 3 (both on her left side) and stays up there:
+ * palm -> fist -> palm, then back to idle.
  */
 const LOCAL_ANIMATIONS = {
-  wave: { row: ANIMATIONS.waving.row, frames: 3, interval: 240, columns: [1, 2, 1] },
+  wave: { row: ANIMATIONS.waving.row, frames: 3, interval: 220, columns: [2, 3, 2] },
 }
 
 const PLUGIN_ID = 'dsh-pet-astra-yao'
