@@ -222,6 +222,28 @@ test('a signed-in account supplies the balance without any API key', async () =>
   assert.equal(fetchImpl.calls.length, 0, 'the account read must not hit the public API')
 })
 
+test('the payload carries the wallet breakdown and when counting started', async () => {
+  // "今日 ¥0.85" is only trustworthy when the user can see which wallets the
+  // number was derived from and since when the drops were observed.
+  const service = createBalanceService({
+    readAccount: async () => ({
+      total: 52.73,
+      currency: 'CNY',
+      wallets: [
+        { kind: 'normal', currency: 'CNY', balance: 50 },
+        { kind: 'bonus', currency: 'CNY', balance: 2.73 },
+      ],
+    }),
+    resolveCredential: async () => null,
+    dshHome: freshHome(),
+    fetchImpl: fetchStub([]),
+  })
+  const payload = await service.getBalance()
+  assert.equal(payload.totalBalance, 52.73)
+  assert.deepEqual(payload.wallets.map((wallet) => wallet.kind).sort(), ['bonus', 'normal'])
+  assert.match(String(payload.observedSince), /^\d{4}-\d{2}-\d{2}T/u, 'counting start is part of the payload')
+})
+
 test('a missing account wallet falls back to the key, account errors are reported', async () => {
   const viaKey = createBalanceService({
     readAccount: async () => ({ code: 'NO_ACCOUNT' }),

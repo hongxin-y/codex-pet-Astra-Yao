@@ -148,6 +148,45 @@ async function placeGenerated(frames, destinations, {
   return scale
 }
 
+function standingLegMask(row, column) {
+  const mask = new Uint8Array(W * H)
+  const mark = (x, y, radius) => {
+    for (let dy = -radius; dy <= radius; dy++) for (let dx = -radius; dx <= radius; dx++) {
+      const nx = x + dx, ny = y + dy
+      if (nx >= 0 && nx < W && ny >= 0 && ny < H) mask[ny * W + nx] = 1
+    }
+  }
+
+  // These bounds are defined from idle cell (0,0), not detected separately
+  // per pose: x=75..119, y=132..202 covers both legs and shoes, but excludes
+  // the raised/right arm. Dilate only the skin outline and shoes by 1–3 px.
+  for (let y = 132; y < 203; y++) for (let x = 75; x < 120; x++) {
+    const offset = ((row * H + y) * SHEET_WIDTH + column * W + x) * 4
+    const r = pixels[offset], g = pixels[offset + 1], b = pixels[offset + 2], a = pixels[offset + 3]
+    if (a > 128 && r > 155 && g > 85 && b > 55 && r > g * 1.15 && g > b * 1.05) mark(x, y, 3)
+  }
+  for (let y = 191; y < 203; y++) for (let x = 75; x < 120; x++) {
+    const offset = ((row * H + y) * SHEET_WIDTH + column * W + x) * 4
+    const r = pixels[offset], g = pixels[offset + 1], b = pixels[offset + 2], a = pixels[offset + 3]
+    if (a > 128 && r + g + b < 260) mark(x, y, 1)
+  }
+  return mask
+}
+
+function matchWaveLegsToIdleMaster() {
+  const masterMask = standingLegMask(0, 0)
+  for (let column = 0; column < 4; column++) {
+    const waveMask = standingLegMask(3, column)
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const i = y * W + x
+      if (!masterMask[i] && !waveMask[i]) continue
+      const source = ((y) * SHEET_WIDTH + x) * 4
+      const target = ((3 * H + y) * SHEET_WIDTH + column * W + x) * 4
+      pixels.copy(pixels, target, source, source + 4)
+    }
+  }
+}
+
 for (let row = 0; row < 11; row++) pixels.fill(0, row * H * stride, (row + 1) * H * stride)
 
 const normalizedRoot = 'assets/atlas-source/normalized/'
@@ -205,7 +244,8 @@ await placeGenerated(workingFrames, workingFrames.map((_, column) => [7, column]
 
 const waveFrames = await gridFrames(normalizedSources.wave, 4, { columns: 2, rows: 2 })
 const waveScale = 198 / Math.max(...waveFrames.map((frame) => frame.height))
-await placeGenerated(waveFrames, waveFrames.map((_, column) => [3, column]), { anchor: 'legs', scaleOverride: waveScale })
+await placeGenerated(waveFrames, waveFrames.map((_, column) => [3, column]), { scaleOverride: waveScale })
+matchWaveLegsToIdleMaster()
 
 // The fourth jump pose extends slightly below the top-row divider; include its
 // full shoes instead of clipping them at the nominal 2-row panel boundary.

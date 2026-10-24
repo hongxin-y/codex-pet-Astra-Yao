@@ -42,6 +42,7 @@ pet-astra-yao/
 |   |-- state.js          # 会话事件 → 桌宠状态（纯函数，便于测试）
 |   |-- atlas.js          # Codex atlas 契约：行列、帧数、方向、取帧算法
 |   |-- balance.js        # DeepSeek 余额查询 + 今日消耗记账
+|   |-- account.js        # 账户钱包（充值 + 赠金）→ 余额的纯映射
 |   |-- config.js         # 配置归一化与 PATCH 校验
 |   `-- client.core.js    # 浏览器端源码（影子 DOM、拖拽、气泡、右键菜单、轮询）
 |-- scripts/
@@ -50,7 +51,7 @@ pet-astra-yao/
 |   `-- audit-atlas.py    # 图集体检：帧数、行内高度、脚底基线（Pillow）
 |-- docs/atlas-brief.md   # 给画图方的重制需求：现状问题 + 一致性规则 + 验收
 |-- lib/client.js         # 构建产物（已提交，DSH 启动时直接加载）
-|-- test/                 # node:test 单测（atlas / state / config / balance / client / host / server）
+|-- test/                 # node:test 单测（atlas / state / config / balance / account / client / host / server）
 |-- assets/icon-180.png   # 插件市场图标（从图集待机帧裁出来）
 |-- pet.json              # Codex 宠物清单（保留，Codex 端仍可用）
 |-- spritesheet.webp      # 图集，同时被 DSH 插件以 /assets 接口提供
@@ -157,8 +158,12 @@ pnpm 会拉仓库、跑 `prepare` 重新生成 `lib/client.js`。这样装的是
   最后才退到环境变量 `DEEPSEEK_API_KEY`。都没配置时显示「未配置 Key」，不会假装有数字。
   接口是 `https://api.deepseek.com/user/balance`（Key 模式），60 秒缓存，浏览器端每 60 秒最多拉一次
   （`GET /balance?refresh=1` 可以强制刷新）。
+- 账户里的「充值余额」和「赠金」是两个钱包、各自扣款，所以余额按币种求和后显示，
+  鼠标悬停能看到 `充值 50.00 + 赠金 2.73` 的拆分。
 - 今日消耗按「余额下降」累计，账本存在 `%USERPROFILE%\.dsh\.dsh-pet-astra-yao-usage.json`，跨天自动归零；
-  充值导致余额上升时不会记成负消耗。
+  充值导致余额上升时不会记成负消耗。它只能统计**观测到之后**的下降，所以悬停提示里会写明
+  「今日 ¥0.90（13:02 起观测）」——今天中途才开始跑的话，这个数字只覆盖那之后的部分，
+  过了零点就会自动变成完整的一天。
 - 没配置 Key、或者当前 DSH 没有暴露 `credentials` / `deepseekAccount` 服务时，气泡显示「余额不可用：未配置 API Key」，
   桌宠其它功能不受影响。DSH 的凭据服务里没有这个 Key 时，服务端会退一步读环境变量
   `DEEPSEEK_API_KEY`，所以在启动 DSH 的环境里导出它同样能显示余额。
@@ -168,6 +173,7 @@ pnpm 会拉仓库、跑 `prepare` 重新生成 `lib/client.js`。这样装的是
 
 「余额条」默认打开：桌宠脚下多一条药丸形状的小横条，写 `¥12.34 · 今日 ¥0.56`，点一下立刻刷新（跳过 60 秒缓存）。
 它跟着桌宠移动，缩放、拖拽、换位置都会重新贴合；没配 Key 时显示「未配置 Key」并变成暖色，不会假装有数字。
+悬停会列出钱包拆分、今日消耗的观测起点和余额来源（登录账户 / API Key）。
 右键菜单里的「余额条」可以单独关掉它，与气泡第三行的「显示余额」互不影响。
 
 ## 配置

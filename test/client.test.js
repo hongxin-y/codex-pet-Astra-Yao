@@ -907,6 +907,40 @@ test('the balance bar sits under her feet and prints the account balance', async
   assert.equal(purse.classList.contains('warn'), false)
 })
 
+test('the balance bar tooltip names the wallets and when counting started', async () => {
+  // A bare "今日 ¥0.85" invites exactly the question "0.85 of what?", so the bar
+  // has to carry the wallet split and the observation window in its tooltip.
+  const { env } = applyWidget({
+    fetch: balanceFetch({
+      session: IDLE_SESSION,
+      config: { showBalanceBar: true },
+      balance: {
+        ok: true,
+        totalBalance: 52.73,
+        currency: 'CNY',
+        todayUsage: 0.9,
+        observedSince: '2026-10-24T05:02:18.000Z',
+        source: 'account',
+        wallets: [
+          { kind: 'normal', currency: 'CNY', balance: 50 },
+          { kind: 'bonus', currency: 'CNY', balance: 2.73 },
+        ],
+      },
+    }),
+  })
+  const shadow = env.body.children[0]._shadow
+  const purse = shadow.querySelector('.purse')
+  env.pump(0)
+  env.runTimer()
+  await settle()
+
+  assert.match(purse.title, /^余额 ¥52\.73/mu)
+  assert.match(purse.title, /充值 50\.00 \+ 赠金 2\.73/u)
+  assert.match(purse.title, /今日 ¥0\.90/u)
+  assert.match(purse.title, /起观测/u, 'the tooltip says when the counting began')
+  assert.match(purse.title, /登录账户钱包/u)
+})
+
 test('the balance bar reports a missing key instead of inventing a number', async () => {
   const { env } = applyWidget({
     fetch: balanceFetch({

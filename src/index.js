@@ -21,6 +21,7 @@ import { readFileSync } from 'node:fs'
 import { localHostOk } from './local-access.js'
 import { createTracker } from './state.js'
 import { createBalanceService } from './balance.js'
+import { readAccountOutcome } from './account.js'
 import { SPRITE_VERSION, describeAtlas } from './atlas.js'
 import { CONFIG_PATCH_FIELDS, applyPatch, defaults, normalizeConfig, readConfig } from './config.js'
 
@@ -399,13 +400,7 @@ export function mount(ctx, config = {}) {
         locale: 'zh-CN',
         timezoneOffsetSeconds: -new Date().getTimezoneOffset() * 60,
       })
-      if (!outcome) return { code: 'NO_ACCOUNT' } // signed out
-      if (outcome.status === 'failed') return { code: 'ACCOUNT_ERROR', transient: true, error: '账户余额读取失败' }
-      const wallets = [...(Array.isArray(outcome.value) ? outcome.value : []), ...(Array.isArray(outcome.bonusWallets) ? outcome.bonusWallets : [])]
-      const wallet = wallets.find((item) => String(item?.currency).toUpperCase() === 'CNY') ?? wallets[0]
-      const total = Number(wallet?.balance)
-      if (!wallet || !Number.isFinite(total)) return { code: 'NO_ACCOUNT' }
-      return { total, currency: String(wallet.currency || 'CNY') }
+      return readAccountOutcome(outcome)
     },
     resolveCredential: async (credentialName) => {
       // A key pasted into the environment is the simplest way to switch the

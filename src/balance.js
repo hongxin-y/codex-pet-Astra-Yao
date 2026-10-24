@@ -78,7 +78,12 @@ export function createBalanceService(options = {}) {
     }
   }
 
-  /** Accumulate the balance drop since the previous observation into today's total. */
+  /**
+   * Accumulate the balance drop since the previous observation into today's total.
+   * Returns both the total and the ISO timestamp of the first observation of the
+   * day, because a number labelled "today" is only honest when it says when the
+   * counting started.
+   */
   function recordUsage(totalBalance) {
     const ledger = readLedger()
     const today = todayKey(now())
@@ -86,15 +91,20 @@ export function createBalanceService(options = {}) {
       ledger.date = today
       ledger.lastBalance = totalBalance
       ledger.todayUsage = 0
+      ledger.since = new Date(now()).toISOString()
     } else {
       const previous = typeof ledger.lastBalance === 'number' ? ledger.lastBalance : totalBalance
       if (typeof previous === 'number' && previous > totalBalance) {
         ledger.todayUsage = Number(ledger.todayUsage || 0) + (previous - totalBalance)
       }
       ledger.lastBalance = totalBalance
+      if (!ledger.since) ledger.since = new Date(now()).toISOString()
     }
     writeLedger(ledger)
-    return Number(ledger.todayUsage || 0)
+    return {
+      todayUsage: Number(ledger.todayUsage || 0),
+      observedSince: typeof ledger.since === 'string' ? ledger.since : null,
+    }
   }
 
   async function request(url, token) {
@@ -106,13 +116,16 @@ export function createBalanceService(options = {}) {
     return response.json()
   }
 
-  function settle(total, currency, source) {
-    const todayUsage = recordUsage(total)
+  function settle(total, currency, source, extra = {}) {
+    const usage = recordUsage(total)
     return {
       ok: true,
       totalBalance: total,
       currency: String(currency || 'CNY'),
-      todayUsage,
+      todayUsage: usage.todayUsage,
+      observedSince: usage.observedSince,
+      wallets: Array.isArray(extra.wallets) ? extra.wallets : [],
+      totalCost: Number.isFinite(extra.totalCost) ? extra.totalCost : null,
       source,
       updatedAt: new Date(now()).toISOString(),
     }
@@ -128,7 +141,12 @@ export function createBalanceService(options = {}) {
       return { code: 'ACCOUNT_ERROR', transient: true, error: `账户余额读取失败: ${clampText(error?.message ?? error, 120)}` }
     }
     if (!outcome) return { code: 'NO_ACCOUNT' }
-    if (Number.isFinite(outcome.total)) return settle(outcome.total, outcome.currency, 'account')
+    if (Number.isFinite(outcome.total)) {
+      return settle(outcome.total, outcome.currency, 'account', {
+        wallets: outcome.wallets,
+        totalCost: outcome.totalCost,
+      })
+    }
     return outcome
   }
 

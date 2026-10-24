@@ -794,6 +794,37 @@ function purseText() {
   return shorten(balanceData.error, 18) || '不可用'
 }
 
+/** `HH:MM` in the viewer's own timezone; empty when the stamp is unusable. */
+function clockLabel(iso) {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return ''
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+}
+
+/**
+ * Tooltip for the balance bar. The bar can only print a short number, but a
+ * number labelled "今日" has to say what it measures: we can only count balance
+ * drops we actually observed, so the tooltip states the wallets behind the total
+ * and the time counting started.
+ */
+function purseTitle() {
+  if (!balanceData) return 'DeepSeek 余额（点击刷新）'
+  if (!balanceData.ok) return `${balanceData.error || '余额不可用'}（点击刷新）`
+  const symbol = balanceSymbol(balanceData.currency)
+  const lines = [`余额 ${symbol}${money(balanceData.totalBalance)}`]
+  const wallets = Array.isArray(balanceData.wallets) ? balanceData.wallets : []
+  if (wallets.length > 1) {
+    lines.push(wallets.map((wallet) => `${wallet.kind === 'bonus' ? '赠金' : '充值'} ${money(wallet.balance)}`).join(' + '))
+  }
+  if (Number(balanceData.todayUsage) > 0) {
+    const since = clockLabel(balanceData.observedSince)
+    lines.push(`今日 ${symbol}${money(balanceData.todayUsage)}${since ? `（${since} 起观测）` : ''}`)
+  }
+  lines.push(balanceData.source === 'account' ? '来源：登录账户钱包' : '来源：API Key')
+  lines.push('点击刷新')
+  return lines.join('\n')
+}
+
 /** The bar sits right under her feet and follows the sprite when it is dragged. */
 function positionPurse() {
   if (!purseEl || !petEl || purseEl.hidden) return
@@ -818,6 +849,7 @@ function renderPurse() {
   purseEl.hidden = !visible
   if (!visible) return
   if (purseValueEl) purseValueEl.textContent = text
+  purseEl.title = purseTitle()
   const warn = Boolean(balanceData) && balanceData.ok !== true
   if (warn) purseEl.classList.add('warn')
   else purseEl.classList.remove('warn')
