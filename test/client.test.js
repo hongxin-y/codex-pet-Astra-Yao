@@ -506,7 +506,7 @@ test('working/thinking flips do not restart the walk cycle while it is still new
   await feed(env, { active: true, sessionId: 's1', state: 'thinking', activity: '', pulse: null, title: null, project: null })
   env.pump(0)
   assert.equal(handle.snapshot.baseState, 'thinking')
-  assert.equal(sprite.style.backgroundPosition, '0px -1248px', 'review is row 8')
+  assert.equal(sprite.style.backgroundPosition, '-288px -1248px', 'review is row 8, hand-on-chin column')
 
   // A tool call escalates immediately: working outranks thinking.
   await feed(env, { active: true, sessionId: 's1', state: 'working', activity: 'shell', pulse: null, title: null, project: null })
@@ -525,7 +525,7 @@ test('working/thinking flips do not restart the walk cycle while it is still new
   env.runTimerMatching((timer) => timer.delay === 1500)
   env.pump(0)
   assert.equal(handle.snapshot.baseState, 'thinking')
-  assert.equal(sprite.style.backgroundPosition, '0px -1248px')
+  assert.equal(sprite.style.backgroundPosition, '-288px -1248px')
 })
 
 test('the speed setting scales the frame interval', async () => {
@@ -603,6 +603,34 @@ test('the failed loop skips the lying frame so the pet never flops over', async 
     '-864px -780px',
     '-1008px -780px',
   ])
+})
+
+test('thinking holds the hand-on-chin pose instead of nodding through six frames', async () => {
+  const { env } = applyWidget()
+  const sprite = env.body.children[0]._shadow.querySelector('.sprite')
+  await feed(env, {
+    active: true,
+    sessionId: 's1',
+    state: 'thinking',
+    activity: '',
+    waitingKind: '',
+    errorKind: '',
+    errorText: '',
+    title: null,
+    project: null,
+    pulse: null,
+  })
+  env.pump(0)
+  assert.equal(sprite.style.backgroundPosition, '-288px -1248px', 'column 2 is the pondering pose')
+
+  env.pump(619)
+  assert.equal(sprite.style.backgroundPosition, '-288px -1248px', 'the pose is held, not flicked through')
+
+  env.pump(2)
+  assert.equal(sprite.style.backgroundPosition, '-432px -1248px', 'column 3 is the slow blink')
+
+  env.pump(620)
+  assert.equal(sprite.style.backgroundPosition, '-288px -1248px', 'and back to pondering')
 })
 
 test('pointer look only engages near the pet, so a far cursor leaves idle animating', () => {

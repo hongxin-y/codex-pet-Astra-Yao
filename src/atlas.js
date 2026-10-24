@@ -41,6 +41,11 @@ export const LOOK_STEP_DEGREES = 360 / LOOK_CELLS // 22.5
  *                 which is clean - mirrored instead.
  *   failed        frame 5 is a lying-down pose; left in the loop the pet flops
  *                 to the floor and stands back up every second.
+ *   review        the six-frame cycle ends in a head-down, eyes-closed nod, so
+ *                 looping it at 150 ms makes the pet nod once a second. Only
+ *                 the hand-on-chin pose (column 2) and its blink (column 3) are
+ *                 used, at a much slower cadence, so "thinking" reads as
+ *                 pondering instead of headbanging.
  */
 export const ANIMATIONS = Object.freeze({
   idle: Object.freeze({ row: 0, frames: 6, interval: 160 }),
@@ -56,7 +61,12 @@ export const ANIMATIONS = Object.freeze({
   }),
   waiting: Object.freeze({ row: 6, frames: 6, interval: 150 }),
   running: Object.freeze({ row: 7, frames: 6, interval: 120 }),
-  review: Object.freeze({ row: 8, frames: 6, interval: 150 }),
+  review: Object.freeze({
+    row: 8,
+    frames: 3,
+    interval: 620,
+    columns: Object.freeze([2, 3, 2]),
+  }),
 })
 
 /**

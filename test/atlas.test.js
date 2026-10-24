@@ -55,7 +55,13 @@ test('animation table uses the Codex row and frame counts', () => {
   })
   assert.deepEqual(ANIMATIONS.waiting, { row: 6, frames: 6, interval: 150 })
   assert.deepEqual(ANIMATIONS.running, { row: 7, frames: 6, interval: 120 })
-  assert.deepEqual(ANIMATIONS.review, { row: 8, frames: 6, interval: 150 })
+  // "Thinking" holds the hand-on-chin pose instead of nodding through all six frames.
+  assert.deepEqual(ANIMATIONS.review, {
+    row: 8,
+    frames: 3,
+    interval: 620,
+    columns: [2, 3, 2],
+  })
   assert.equal(animationFor('missing'), ANIMATIONS.idle)
 })
 
