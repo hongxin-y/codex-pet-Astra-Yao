@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
@@ -458,11 +459,63 @@ test('normalizeConfig defaults used by the host are the shipped defaults', () =>
     paused: false,
     showBubble: true,
     showBubbleUsage: false,
+    showBalanceBar: true,
     lookAtPointer: true,
     includeSubagents: false,
     posX: null,
     posY: null,
   })
+})
+
+test('the balance service falls back to DEEPSEEK_API_KEY from the environment', async () => {
+  // A `link:` install cannot rely on the profile's credential store, so the
+  // resolver degrades to the process environment instead of throwing.
+  const originalFetch = globalThis.fetch
+  const originalHome = process.env.DSH_HOME
+  const seen = []
+  globalThis.fetch = async (url, init) => {
+    seen.push({ url: String(url), auth: init?.headers?.authorization ?? init?.headers?.Authorization })
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({ is_available: true, balance_infos: [{ currency: 'CNY', total_balance: '12.34' }] }),
+    }
+  }
+  process.env.DEEPSEEK_API_KEY = 'sk-env-test'
+  process.env.DSH_HOME = mkdtempSync(join(tmpdir(), 'dsh-pet-astra-yao-env-'))
+  try {
+    const { httpCtx } = fakeHttpContext()
+    const provided = {
+      credentials: {
+        resolve: async () => {
+          throw new Error('the credential store has no API key')
+        },
+      },
+      webServer: httpCtx.webServer,
+    }
+    const ctx = {
+      logger: { warn() {} },
+      on: () => () => {},
+      effect: (factory) => factory(),
+      inject(services, callback) {
+        if (services.includes('settings')) return
+        const scoped = { effect: (factory) => factory(), get: (name) => provided[name] }
+        for (const name of services) scoped[name] = provided[name]
+        callback(scoped)
+      },
+    }
+
+    const mounted = mount(ctx, {})
+    const payload = await mounted.balance.getBalance({ force: true })
+    assert.equal(payload.ok, true)
+    assert.equal(payload.totalBalance, 12.34)
+    assert.equal(seen[0].auth, 'Bearer sk-env-test', 'the environment key reaches the HTTP call')
+  } finally {
+    delete process.env.DEEPSEEK_API_KEY
+    if (originalHome === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = originalHome
+    globalThis.fetch = originalFetch
+  }
 })
 
 test('balance endpoint returns the service payload and refuses non-GET', async () => {

@@ -66,6 +66,7 @@ export const Config = Schema && Schema.object({
   paused: Schema.boolean().default(false).description('Pause the frame animation').volatile(),
   showBubble: Schema.boolean().default(true).description('Show the status bubble above the pet').volatile(),
   showBubbleUsage: Schema.boolean().default(false).description('Show the DeepSeek balance in the bubble').volatile(),
+  showBalanceBar: Schema.boolean().default(true).description('Show a small balance bar under the pet').volatile(),
   lookAtPointer: Schema.boolean().default(true).description('Turn the pet toward the pointer when it is nearby').volatile(),
   includeSubagents: Schema.boolean().default(false).description('Let subagent sessions drive the pet state').volatile(),
   posX: Schema.number().default(null).description('Saved horizontal position in CSS pixels (null = default corner)').volatile(),
@@ -383,14 +384,24 @@ export function mount(ctx, config = {}) {
     })
   }
   const balance = createBalanceService({
-    resolveCredential: (credentialName) => {
+    resolveCredential: async (credentialName) => {
+      // A key pasted into the environment is the simplest way to switch the
+      // readout on without going through DSH's credential store; the store wins
+      // when both exist because it is the user-visible one.
       const service = credentialsService
-      if (!service || typeof service.resolve !== 'function') return Promise.resolve(null)
-      try {
-        return service.resolve(credentialName)
-      } catch (error) {
-        return Promise.reject(error)
+      if (service && typeof service.resolve === 'function') {
+        try {
+          const found = await service.resolve(credentialName)
+          if (found) return found
+        } catch (error) {
+          if (credentialName !== 'DEEPSEEK_API_KEY') return Promise.reject(error)
+        }
       }
+      if (credentialName === 'DEEPSEEK_API_KEY') {
+        const fromEnv = String(process.env?.DEEPSEEK_API_KEY ?? '').trim()
+        if (fromEnv) return { value: fromEnv }
+      }
+      return null
     },
     log: (message) => loggerOf(ctx)?.warn?.(`dsh-pet-astra-yao: ${message}`),
   })

@@ -273,8 +273,9 @@ function makeContextHandle(env) {
   }
 }
 
-function applyWidget() {
+function applyWidget(options = {}) {
   const { env, context } = loadBundle()
+  if (options.fetch) env.sandbox.fetch = options.fetch
   const entry = env.load()
   assert.equal(entry.id, BUNDLE_ID)
   const plugin = entry.factory((name) => {
@@ -434,6 +435,23 @@ function feed(env, session, config = {}, pet = undefined) {
   env.sandbox.fetch = async () => ({ ok: true, status: 200, json: async () => sessionPayload(session, config, pet) })
   return env.runTimer()
 }
+
+/** Route /balance and /state separately so the money readout can be exercised. */
+function balanceFetch({ session = 'idle-session', config = {}, balance = undefined } = {}) {
+  return async (url) => {
+    if (String(url).includes('/balance')) {
+      return { ok: true, status: 200, json: async () => ({ ok: balance?.ok === true, balance, serverTime: 1 }) }
+    }
+    return { ok: true, status: 200, json: async () => sessionPayload(session, config) }
+  }
+}
+
+function feedWithBalance(env, { session, config = {}, balance }) {
+  env.sandbox.fetch = balanceFetch({ session, config, balance })
+  return env.runTimer()
+}
+
+const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
 
 test('a new sheet revision replaces the cached spritesheet URL', async () => {
   const { env } = applyWidget()
@@ -759,6 +777,19 @@ test('pointer look follows a nearby cursor and can be switched off', async () =>
 // Status bubble placement
 // ---------------------------------------------------------------------------
 
+const IDLE_SESSION = {
+  active: true,
+  sessionId: 's1',
+  state: 'idle',
+  activity: '',
+  waitingKind: '',
+  errorKind: '',
+  errorText: '',
+  title: null,
+  project: null,
+  pulse: null,
+}
+
 const WORKING_SESSION = {
   active: true,
   sessionId: 's1',
@@ -849,4 +880,74 @@ test('the poke line steps through her answers and clears on its own', () => {
   env.runTimerMatching((timer) => timer.delay === 2600)
   assert.notEqual(bubbleDetail.textContent, '在呢～', 'after the timeout the idle line is back')
   assert.equal(bubbleState.hidden, true, 'the idle bubble still hides the technical status row')
+})
+
+test('the balance bar sits under her feet and prints the account balance', async () => {
+  const { env } = applyWidget({
+    fetch: balanceFetch({
+      session: IDLE_SESSION,
+      config: { showBalanceBar: true },
+      balance: { ok: true, totalBalance: 42.5, currency: 'USD', todayUsage: 1.24 },
+    }),
+  })
+  const shadow = env.body.children[0]._shadow
+  const pet = shadow.querySelector('.pet')
+  const purse = shadow.querySelector('.purse')
+  const value = shadow.querySelector('.purse-value')
+  pet._box = { left: 1000, top: 600, width: 144, height: 156 }
+  purse._box = { left: 0, top: 0, width: 120, height: 22 }
+  env.pump(0)
+  env.runTimer()
+  await settle()
+
+  assert.equal(purse.hidden, false)
+  assert.equal(value.textContent, '$42.50 · 今日 $1.24')
+  assert.equal(purse.style.left, '1012px') // centred on the pet: 1072 - 120 / 2
+  assert.equal(purse.style.top, '759px') // 600 + 156 + 3
+  assert.equal(purse.classList.contains('warn'), false)
+})
+
+test('the balance bar reports a missing key instead of inventing a number', async () => {
+  const { env } = applyWidget({
+    fetch: balanceFetch({
+      session: IDLE_SESSION,
+      config: { showBalanceBar: true },
+      balance: { ok: false, code: 'NO_KEY', error: '未配置 DEEPSEEK_API_KEY' },
+    }),
+  })
+  const shadow = env.body.children[0]._shadow
+  const purse = shadow.querySelector('.purse')
+  const value = shadow.querySelector('.purse-value')
+  env.pump(0)
+  env.runTimer()
+  await settle()
+
+  assert.equal(purse.hidden, false)
+  assert.equal(value.textContent, '未配置 Key')
+  assert.equal(purse.classList.contains('warn'), true)
+})
+
+test('the balance bar stays hidden while it is switched off, and follows the config', async () => {
+  const { env } = applyWidget({
+    fetch: balanceFetch({
+      session: IDLE_SESSION,
+      config: { showBalanceBar: false },
+      balance: { ok: true, totalBalance: 7, currency: 'CNY' },
+    }),
+  })
+  const shadow = env.body.children[0]._shadow
+  const purse = shadow.querySelector('.purse')
+  env.pump(0)
+  env.runTimer()
+  await settle()
+  assert.equal(purse.hidden, true, 'turning 余额条 off hides the bar')
+
+  await feedWithBalance(env, {
+    session: IDLE_SESSION,
+    config: { showBalanceBar: true },
+    balance: { ok: true, totalBalance: 7, currency: 'CNY' },
+  })
+  await settle()
+  assert.equal(purse.hidden, false, 'turning it back on shows the bar again')
+  assert.equal(shadow.querySelector('.purse-value').textContent, '¥7.00')
 })

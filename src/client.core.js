@@ -65,6 +65,7 @@ const DEFAULT_CONFIG = Object.freeze({
   paused: false,
   showBubble: true,
   showBubbleUsage: false,
+  showBalanceBar: true,
   lookAtPointer: true,
   posX: null,
   posY: null,
@@ -223,6 +224,27 @@ const TEMPLATE = `
   }
   .bubble-usage { color: #9fd7a8; font-size: 11px; white-space: nowrap; }
   .bubble-sub[hidden], .bubble-usage[hidden], .bubble-detail[hidden] { display: none; }
+  .purse {
+    position: fixed;
+    display: inline-flex;
+    align-items: baseline;
+    gap: 5px;
+    padding: 2px 9px;
+    border-radius: 999px;
+    background: rgba(18, 20, 26, .9);
+    border: 1px solid rgba(255, 255, 255, .08);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, .32);
+    color: #9fd7a8;
+    font: 11px/1.6 "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    pointer-events: auto;
+    cursor: pointer;
+    backdrop-filter: blur(8px);
+  }
+  .purse[hidden] { display: none; }
+  .purse-label { color: #7d8a9d; }
+  .purse.warn { color: #d8b371; }
   .menu {
     position: fixed;
     width: 214px;
@@ -288,6 +310,10 @@ const TEMPLATE = `
 <div class="pet" title="Astra Yao">
   <div class="sprite"></div>
 </div>
+<div class="purse" hidden title="DeepSeek 余额（点击刷新）">
+  <span class="purse-label">余额</span>
+  <span class="purse-value">—</span>
+</div>
 <div class="bubble" hidden>
   <div class="bubble-main">
     <span class="bubble-state">待机</span>
@@ -305,6 +331,7 @@ const TEMPLATE = `
   <label class="row"><span>显示桌宠</span><input type="checkbox" data-field="hidden"></label>
   <label class="row"><span>状态气泡</span><input type="checkbox" data-field="showBubble"></label>
   <label class="row"><span>显示余额</span><input type="checkbox" data-field="showBubbleUsage"></label>
+  <label class="row"><span>余额条</span><input type="checkbox" data-field="showBalanceBar"></label>
   <label class="row"><span>大小</span><input type="range" data-field="scale" min="0.5" max="2" step="0.05"></label>
   <label class="row"><span>不透明度</span><input type="range" data-field="opacity" min="0.3" max="1" step="0.05"></label>
   <label class="row"><span>动画速度</span><input type="range" data-field="speed" min="0.5" max="1.6" step="0.05"></label>
@@ -333,6 +360,8 @@ let bubbleDetailEl = null
 let bubbleSubEl = null
 let bubbleUsageEl = null
 let menuBalanceEl = null
+let purseEl = null
+let purseValueEl = null
 
 let cfg = { ...DEFAULT_CONFIG }
 let session = null
@@ -482,6 +511,7 @@ function place(left, top) {
   petEl.style.right = 'auto'
   petEl.style.bottom = 'auto'
   positionBubble()
+  positionPurse()
 }
 
 function placeGhost() {
@@ -752,6 +782,48 @@ function positionBubble() {
   }
 }
 
+function purseText() {
+  if (!cfg.showBalanceBar) return ''
+  if (!balanceData) return balancePending ? '查询中…' : ''
+  if (balanceData.ok) {
+    const symbol = balanceSymbol(balanceData.currency)
+    const today = Number(balanceData.todayUsage) > 0 ? ` · 今日 ${symbol}${money(balanceData.todayUsage)}` : ''
+    return `${symbol}${money(balanceData.totalBalance)}${today}`
+  }
+  if (balanceData.code === 'NO_KEY') return '未配置 Key'
+  return shorten(balanceData.error, 18) || '不可用'
+}
+
+/** The bar sits right under her feet and follows the sprite when it is dragged. */
+function positionPurse() {
+  if (!purseEl || !petEl || purseEl.hidden) return
+  const petRect = petEl.getBoundingClientRect()
+  const rect = purseEl.getBoundingClientRect()
+  const margin = 6
+  const centre = petRect.left + petRect.width / 2
+  let left = centre - rect.width / 2
+  left = clamp(left, margin, Math.max(margin, window.innerWidth - rect.width - margin))
+  let top = petRect.top + petRect.height + 3
+  if (top + rect.height > window.innerHeight - margin) {
+    top = Math.max(margin, window.innerHeight - rect.height - margin)
+  }
+  purseEl.style.left = `${Math.round(left)}px`
+  purseEl.style.top = `${Math.round(top)}px`
+}
+
+function renderPurse() {
+  if (!purseEl) return
+  const text = purseText()
+  const visible = Boolean(text) && cfg.hidden !== true && cfg.enabled !== false
+  purseEl.hidden = !visible
+  if (!visible) return
+  if (purseValueEl) purseValueEl.textContent = text
+  const warn = Boolean(balanceData) && balanceData.ok !== true
+  if (warn) purseEl.classList.add('warn')
+  else purseEl.classList.remove('warn')
+  positionPurse()
+}
+
 function renderBubble() {
   if (!bubbleEl) return
   // While idle the bubble speaks in her own voice, so a "后台待机" prefix in front
@@ -778,12 +850,13 @@ function renderBubble() {
   }
   bubbleEl.hidden = !bubbleVisible()
   if (!bubbleEl.hidden) positionBubble()
-  if (cfg.showBubbleUsage) maybeRefreshBalance()
+  if (cfg.showBubbleUsage || cfg.showBalanceBar) maybeRefreshBalance()
   syncMenuBalance()
+  renderPurse()
 }
 
 function maybeRefreshBalance() {
-  if (!cfg.showBubbleUsage || balancePending) return
+  if (!(cfg.showBubbleUsage || cfg.showBalanceBar) || balancePending) return
   if (Date.now() - balanceCheckedAt < BALANCE_TTL_MS) return
   fetchBalance(false)
 }
@@ -892,6 +965,7 @@ function syncMenu() {
   menuEl.querySelector('[data-field="lookAtPointer"]').checked = cfg.lookAtPointer !== false
   menuEl.querySelector('[data-field="showBubble"]').checked = cfg.showBubble !== false
   menuEl.querySelector('[data-field="showBubbleUsage"]').checked = Boolean(cfg.showBubbleUsage)
+  menuEl.querySelector('[data-field="showBalanceBar"]').checked = cfg.showBalanceBar !== false
   menuEl.querySelector('[data-field="scale"]').value = String(cfg.scale)
   menuEl.querySelector('[data-field="opacity"]').value = String(cfg.opacity)
   menuEl.querySelector('[data-field="speed"]').value = String(speedFactor())
@@ -1163,6 +1237,7 @@ function onMenuInput(event) {
     field === 'mirror' ||
     field === 'showBubble' ||
     field === 'showBubbleUsage' ||
+    field === 'showBalanceBar' ||
     field === 'lookAtPointer'
   ) {
     sendPatch({ [field]: event.target.checked })
@@ -1240,6 +1315,8 @@ function mount() {
   bubbleSubEl = shadow.querySelector('.bubble-sub')
   bubbleUsageEl = shadow.querySelector('.bubble-usage')
   menuBalanceEl = shadow.querySelector('.menu-balance')
+  purseEl = shadow.querySelector('.purse')
+  purseValueEl = shadow.querySelector('.purse-value')
 
   applySheet(loadedSheetVersion)
 
@@ -1247,6 +1324,7 @@ function mount() {
 
   listen(petEl, 'pointerdown', onPointerDown)
   listen(petEl, 'contextmenu', onContextMenu)
+  listen(purseEl, 'click', () => fetchBalance(true))
   listen(ghostEl, 'pointerdown', (event) => {
     event.preventDefault()
     sendPatch({ hidden: false })

@@ -18,6 +18,7 @@
         paused: false
         showBubble: true
         showBubbleUsage: false
+        showBalanceBar: true
         lookAtPointer: true
         includeSubagents: false
         posX: null
