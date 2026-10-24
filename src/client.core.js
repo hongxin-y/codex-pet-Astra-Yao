@@ -28,15 +28,13 @@ const LOOK_CELLS = ATLAS.lookCells
 /**
  * Client-only derivations of the shared atlas.
  *
- * The waving row carries four poses whose free hand jumps hip -> shoulder ->
- * overhead -> fist, and its second cell draws the raised palm on the *staff*
- * side, so she ends up with two right hands. The poke answer therefore only
- * uses cells 2 and 3 (both on her left side) and stays up there:
- * palm -> fist -> palm, then back to idle.
+ * The waving row is a separate redraw: its skirt, legs and staff placement do
+ * not line up with the idle row, so playing it on click makes the whole
+ * character appear to change. Nothing is derived here today; the map stays as
+ * the single place for client-side animation variants.
  */
-const LOCAL_ANIMATIONS = {
-  wave: { row: ANIMATIONS.waving.row, frames: 3, interval: 220, columns: [2, 3, 2] },
-}
+const LOCAL_ANIMATIONS = {}
+
 
 const PLUGIN_ID = 'dsh-pet-astra-yao'
 const ROOT_ID = 'dsh-pet-astra-yao-root'
@@ -99,6 +97,17 @@ const IDLE_LINES = Object.freeze([
   '让旋律带着你走～',
 ])
 
+// Poking her should not swap drawings: the waving row is a separate redraw whose
+// skirt, legs and staff sit differently from the idle row, so switching to it
+// makes the character visibly change. She bobs in place instead and answers.
+const POKE_LINES = Object.freeze([
+  '在呢～',
+  '叫我？',
+  '这一下，算安可～',
+  '听得到，听得到。',
+])
+const POKE_LINE_MS = 2600
+
 const WAITING_LABELS = Object.freeze({
   ask: '等你回话',
   'plan-review': '等你定夺',
@@ -142,6 +151,13 @@ const TEMPLATE = `
     filter: drop-shadow(0 8px 14px rgba(0, 0, 0, .28));
   }
   .pet.dragging { cursor: grabbing; }
+  .pet.poked { animation: pet-bob .36s ease; }
+  @keyframes pet-bob {
+    0%, 100% { transform: translateY(0); }
+    28% { transform: translateY(-6px); }
+    56% { transform: translateY(0); }
+    78% { transform: translateY(-2px); }
+  }
   .sprite {
     display: block;
     background-repeat: no-repeat;
@@ -350,6 +366,10 @@ let pollFailures = 0
 let lastPulseId = 0
 let idleLineIndex = 0
 let idleLineSince = 0
+let pokeLineIndex = 0
+let pokeLine = ''
+let pokeLineUntil = 0
+let pokeTimer = 0
 let menuOpen = false
 let rafId = 0
 let pollTimer = 0
@@ -664,6 +684,7 @@ function idleLine() {
 }
 
 function detailText() {
+  if (pokeLine && performance.now() < pokeLineUntil) return pokeLine
   if (session?.pulse?.animation === 'jumping') return '完美谢幕～'
   if (snapshotState === 'idle') return idleLine()
   if (!session || !session.active) return ''
@@ -1083,7 +1104,26 @@ function poke() {
     acknowledge()
     return
   }
-  play('wave', { once: true })
+  bob()
+  pokeLine = POKE_LINES[pokeLineIndex % POKE_LINES.length]
+  pokeLineIndex += 1
+  pokeLineUntil = performance.now() + POKE_LINE_MS
+  renderBubble()
+  if (pokeTimer) clearTimeout(pokeTimer)
+  pokeTimer = setTimeout(() => {
+    pokeTimer = 0
+    pokeLine = ''
+    renderBubble()
+  }, POKE_LINE_MS)
+}
+
+/** A small in-place hop: no row switch, so the drawing never changes. */
+function bob() {
+  if (!petEl) return
+  petEl.classList.remove('poked')
+  // Reading layout restarts the CSS animation when she is poked repeatedly.
+  void petEl.offsetWidth
+  petEl.classList.add('poked')
 }
 
 function updateLook(event) {
@@ -1258,6 +1298,7 @@ function teardown() {
   cancelAnimationFrame(rafId)
   clearTimeout(pollTimer)
   clearTimeout(baseTimer)
+  clearTimeout(pokeTimer)
   patchTimers.forEach((timer) => clearTimeout(timer))
   patchTimers.clear()
   for (const cleanup of cleanups.splice(0)) {
