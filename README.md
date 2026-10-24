@@ -13,9 +13,10 @@ DeepSeek Harness（DSH）可以识别的插件：装进 profile 之后，Astra Y
 
 > **English:** Astra Yao is a Codex v2 sprite-atlas pet for the DeepSeek Harness web GUI. One 1536×2288
 > atlas (8×11 frames of 192×208) drives nine animations; the server half follows session events, so the pet
-> idles, thinks, runs while tools are working, waits on approvals and lies down on errors. The browser half
-> paints it in a shadow-root widget with drag-to-move, a status bubble, a right-click menu and an optional
-> pointer-look mode. The bubble can also show the DeepSeek account balance and today's spend.
+> idles, thinks, runs while tools are working and waits on approvals. The browser half paints it in a
+> shadow-root widget with drag-to-move, a status bubble, a right-click menu and an optional pointer-look
+> mode. The bubble keeps a stage-flavoured status line and rotates backstage quips while the pet is idle,
+> and can also show the DeepSeek account balance and today's spend.
 > Install with `dsh plugin --profile desktop add <path-to-this-repo>`.
 
 ## 目录
@@ -104,22 +105,25 @@ pnpm 会拉仓库、跑 `prepare` 重新生成 `lib/client.js`。这样装的是
 
 | DSH 会话 | 桌宠 |
 | --- | --- |
-| `turn/start` | 思考中（`review`，翻谱） |
-| `tool/call`（有工具在跑） | 执行中（`running`，小跑） |
-| `ask_user_question` / `exit_plan_mode` / `approval/asked` | 等待确认（`waiting`，托腮） |
-| `turn/end` 且 `reason.kind === "completed"` | 待机 + 跳一下（`jumping`，5 秒内一次） |
-| 工具报错 / 异常结束 | 出错（`failed`，躺平），点一下或开始下一轮对话后恢复 |
-| `turn/end` 且 `blocked` | 等待确认 |
-| `turn/end` 且 `aborted` / `disposed` | 待机 |
+| `turn/start` | 构思中（`review`，托腮） |
+| `tool/call`（有工具在跑） | 演出中（`running`，小跑） |
+| `ask_user_question` / `exit_plan_mode` / `approval/asked` | 候场中（`waiting`，托腮） |
+| `turn/end` 且 `reason.kind === "completed"` | 后台待机 + 谢幕跳一下（`jumping`，5 秒内一次） |
+| 工具报错 / 异常结束 | 破音了（`failed`，低头），点一下或开始下一轮对话后恢复 |
+| `turn/end` 且 `blocked` | 候场中 |
+| `turn/end` 且 `aborted` / `disposed` | 后台待机 |
 
 子会话默认被忽略；把 `includeSubagents` 打开后，子代理的活动也会驱动桌宠。
 
 ## 状态气泡与余额
 
 桌宠头顶的气泡会写三行：当前状态、细节（正在跑的工具 / 等你确认的类型 / 报错原文）、当前会话的项目和标题。
+状态用舞台腔：**后台待机 / 构思中 / 演出中 / 候场中 / 破音了**——她是歌手，不是仪表盘。
+待机时第二行换成台词，每 9 秒轮换一句（「今晚的主角，是我。」「掌声在哪里？」……），桌宠不会像卡住；
+任务完成那几秒会先显示「完美谢幕～」。
 气泡贴着桌宠所在那一侧的边缘展开，底部的小尖角始终指向桌宠；贴到屏幕顶端放不下时自动翻到桌宠下方。
 最小宽度 128 px、最大 240 px，文案变长时换行而不是把气泡撑到半个屏幕。
-空闲超过 10 秒自动收起，有新动作再出现；右键菜单里的「状态气泡」可以关掉它。
+右键菜单里的「状态气泡」可以整个关掉它。
 
 「显示余额」打开后，第三行换成 DeepSeek 账户余额和今日消耗：
 
@@ -176,7 +180,7 @@ pnpm 会拉仓库、跑 `prepare` 重新生成 `lib/client.js`。这样装的是
 ```powershell
 npm run build     # 改完 src/client.core.js 后重新生成 lib/client.js
 npm run verify    # 自检：清单字段、补丁行、bundle、图集尺寸（1536×2288 / v2）
-npm test          # node:test：atlas / config / state / balance / client / host / server 共 64 个用例
+npm test          # node:test：atlas / config / state / balance / client / host / server 共 65 个用例
 
 # 换图集之后先跑这个（需要 Pillow）：帧数、行内角色高度、脚底基线、头部密度
 python scripts/audit-atlas.py spritesheet.webp

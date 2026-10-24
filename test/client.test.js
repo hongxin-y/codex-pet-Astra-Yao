@@ -455,7 +455,7 @@ test('the status bubble mirrors the session and honours showBubble', async () =>
   })
 
   assert.equal(bubble.hidden, false)
-  assert.equal(bubbleState.textContent, '执行中')
+  assert.equal(bubbleState.textContent, '演出中')
   assert.equal(bubbleDetail.hidden, false)
   assert.equal(bubbleDetail.textContent, 'shell')
   assert.equal(bubbleSub.textContent, 'pet-astra-yao · 修 bug')
@@ -488,13 +488,44 @@ test('a failed turn shows the error text until acknowledged', async () => {
     project: null,
     pulse: null,
   })
-  assert.equal(bubbleState.textContent, '出错了')
+  assert.equal(bubbleState.textContent, '破音了')
   assert.equal(bubbleDetail.textContent, 'HTTP 500 from the model gateway')
 
   const handle = env.sandbox.__DSH_PET_ASTRA_YAO__
   handle.acknowledge()
   await Promise.resolve()
-  assert.equal(bubbleState.textContent, '待机')
+  assert.equal(bubbleState.textContent, '后台待机')
+})
+
+test('idle cycles backstage lines instead of a technical status', async () => {
+  const { env } = applyWidget()
+  const shadow = env.body.children[0]._shadow
+  const bubbleState = shadow.querySelector('.bubble-state')
+  const bubbleDetail = shadow.querySelector('.bubble-detail')
+  const idle = {
+    active: true,
+    sessionId: 's1',
+    state: 'idle',
+    activity: '',
+    waitingKind: '',
+    errorKind: '',
+    errorText: '',
+    title: '修 bug',
+    project: 'pet-astra-yao',
+    pulse: null,
+  }
+
+  await feed(env, idle)
+  assert.equal(bubbleState.hidden, true, 'the idle line speaks for itself')
+  assert.equal(bubbleDetail.textContent, '今晚的主角，是我。')
+
+  env.advanceClock(9000)
+  await feed(env, idle)
+  assert.equal(bubbleDetail.textContent, '灯光准备好了吗？')
+
+  env.advanceClock(9000)
+  await feed(env, idle)
+  assert.equal(bubbleDetail.textContent, '麦克风试音，一二三～')
 })
 
 test('working/thinking flips do not restart the walk cycle while it is still new', async () => {

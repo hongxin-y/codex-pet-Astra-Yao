@@ -42,8 +42,8 @@ const POLL_TIMEOUT_MS = 5000
 const PATCH_DEBOUNCE_MS = 180
 /** A working/thinking flip must be stable this long before the base pose changes. */
 const BASE_HOLD_MS = 1500
-/** Idle bubbles fade out after this much quiet time. */
-const BUBBLE_IDLE_MS = 10_000
+/** How long one backstage line stays on screen while the pet is idle. */
+const IDLE_LINE_MS = 9000
 /** Balance is re-read at most this often. */
 const BALANCE_TTL_MS = 60_000
 
@@ -64,30 +64,42 @@ const DEFAULT_CONFIG = Object.freeze({
 })
 
 const STATE_LABELS = Object.freeze({
-  idle: '待机',
-  thinking: '思考中',
-  working: '执行中',
-  waiting: '等待确认',
-  error: '出错了',
+  idle: '后台待机',
+  thinking: '构思中',
+  working: '演出中',
+  waiting: '候场中',
+  error: '破音了',
 })
 
+// Astra Yao is a stage singer: while she is idle the bubble shows a line of
+// backstage chatter instead of a technical status, and rotates it slowly so the
+// pet does not look frozen.
+const IDLE_LINES = Object.freeze([
+  '今晚的主角，是我。',
+  '灯光准备好了吗？',
+  '麦克风试音，一二三～',
+  '掌声在哪里？',
+  '演出前，先润润嗓子。',
+  '返场？现在就想听？',
+])
+
 const WAITING_LABELS = Object.freeze({
-  ask: '等你回答',
-  'plan-review': '等你确认计划',
-  approval: '等你批准',
+  ask: '等你回话',
+  'plan-review': '等你定夺',
+  approval: '等你点头',
 })
 
 // Tool names that mean "the pet is waiting on you" — shown when the tracker
 // reports a wait but no finer-grained waitingKind.
 const TOOL_LABELS = Object.freeze({
-  ask_user_question: '等你回答',
-  exit_plan_mode: '等你确认计划',
+  ask_user_question: '等你回话',
+  exit_plan_mode: '等你定夺',
 })
 
 const ERROR_LABELS = Object.freeze({
   blocked: '任务被阻塞',
-  'max-tokens': '超出上下文上限',
-  error: '对话失败',
+  'max-tokens': '上下文到顶了',
+  error: '演出中断',
 })
 
 const BASE_PRIORITY = Object.freeze({
@@ -320,7 +332,8 @@ let disposed = false
 let online = false
 let pollFailures = 0
 let lastPulseId = 0
-let lastActiveAt = Date.now()
+let idleLineIndex = 0
+let idleLineSince = 0
 let menuOpen = false
 let rafId = 0
 let pollTimer = 0
@@ -562,7 +575,7 @@ function setState(nextState) {
   const state = String(nextState ?? 'idle')
   const changed = state !== snapshotState
   snapshotState = state
-  if (state !== 'idle') lastActiveAt = Date.now()
+  if (changed && state === 'idle') idleLineSince = performance.now()
   if (stateEl) stateEl.textContent = STATE_LABELS[state] ?? state
   if (changed) requestBase(state)
   updateTooltip()
@@ -599,7 +612,19 @@ function money(value) {
   return Number.isFinite(number) ? number.toFixed(2) : '--'
 }
 
+function idleLine() {
+  const now = performance.now()
+  if (!idleLineSince) idleLineSince = now
+  else if (now - idleLineSince >= IDLE_LINE_MS) {
+    idleLineIndex = (idleLineIndex + 1) % IDLE_LINES.length
+    idleLineSince = now
+  }
+  return IDLE_LINES[idleLineIndex] ?? IDLE_LINES[0]
+}
+
 function detailText() {
+  if (session?.pulse?.animation === 'jumping') return '完美谢幕～'
+  if (snapshotState === 'idle') return idleLine()
   if (!session || !session.active) return ''
   if (snapshotState === 'working' || snapshotState === 'thinking') return shorten(session.activity, 24)
   if (snapshotState === 'waiting') {
@@ -607,7 +632,7 @@ function detailText() {
     if (waiting) return waiting
     const tool = TOOL_LABELS[session.activity]
     if (tool) return tool
-    return shorten(session.activity, 24) || '等你操作'
+    return shorten(session.activity, 24) || '等你发话'
   }
   if (snapshotState === 'error') {
     return shorten(session.errorText, 40) || ERROR_LABELS[session.errorKind] || '点我一下确认'
@@ -637,10 +662,9 @@ function usageText() {
 }
 
 function bubbleVisible() {
-  if (!cfg.showBubble || cfg.hidden || !bubbleEl) return false
-  if (snapshotState !== 'idle') return true
-  if (session?.pulse) return true
-  return Date.now() - lastActiveAt < BUBBLE_IDLE_MS
+  // The bubble stays up while idle on purpose: it carries the backstage line
+  // that makes the pet feel alive. Turning 状态气泡 off hides it entirely.
+  return Boolean(bubbleEl) && cfg.showBubble !== false && cfg.hidden !== true
 }
 
 function positionBubble() {
@@ -680,7 +704,13 @@ function positionBubble() {
 
 function renderBubble() {
   if (!bubbleEl) return
-  if (bubbleStateEl) bubbleStateEl.textContent = STATE_LABELS[snapshotState] ?? snapshotState
+  // While idle the bubble speaks in her own voice, so a "后台待机" prefix in front
+  // of the line would only repeat itself; the label comes back for real states.
+  const showState = snapshotState !== 'idle'
+  if (bubbleStateEl) {
+    bubbleStateEl.hidden = !showState
+    bubbleStateEl.textContent = STATE_LABELS[snapshotState] ?? snapshotState
+  }
   const detail = detailText()
   if (bubbleDetailEl) {
     bubbleDetailEl.hidden = !detail
@@ -1155,7 +1185,7 @@ function mount() {
   spriteWidth = 0
   baseState = snapshotState
   baseSince = Date.now()
-  lastActiveAt = Date.now()
+  idleLineSince = 0
   applyConfig(cfg)
   playBase()
   updateTooltip()
