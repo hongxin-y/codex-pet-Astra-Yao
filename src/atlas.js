@@ -42,7 +42,7 @@ export const ANIMATIONS = Object.freeze({
   idle: Object.freeze({ row: 0, frames: 6, interval: 160 }),
   runningRight: Object.freeze({ row: 1, frames: 8, interval: 120 }),
   runningLeft: Object.freeze({ row: 2, frames: 8, interval: 120 }),
-  waving: Object.freeze({ row: 3, frames: 4, interval: 140 }),
+  waving: Object.freeze({ row: 3, frames: 4, interval: 200 }),
   jumping: Object.freeze({ row: 4, frames: 5, interval: 140 }),
   failed: Object.freeze({ row: 5, frames: 8, interval: 140 }),
   waiting: Object.freeze({ row: 6, frames: 6, interval: 150 }),

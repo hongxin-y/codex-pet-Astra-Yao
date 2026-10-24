@@ -26,12 +26,8 @@ const LOOK_ROW = ATLAS.lookRow
 const LOOK_CELLS = ATLAS.lookCells
 
 /**
- * Client-only derivations of the shared atlas.
- *
- * The waving row is a separate redraw: its skirt, legs and staff placement do
- * not line up with the idle row, so playing it on click makes the whole
- * character appear to change. Nothing is derived here today; the map stays as
- * the single place for client-side animation variants.
+ * Client-only remaps of the shared atlas. Keep empty unless this client needs
+ * a different cadence or cell order; the artwork itself remains shared.
  */
 const LOCAL_ANIMATIONS = {}
 
@@ -97,9 +93,8 @@ const IDLE_LINES = Object.freeze([
   '让旋律带着你走～',
 ])
 
-// Poking her should not swap drawings: the waving row is a separate redraw whose
-// skirt, legs and staff sit differently from the idle row, so switching to it
-// makes the character visibly change. She bobs in place instead and answers.
+// Poking gives a short in-place bob and a reply without interrupting the
+// currently selected mood or animation row.
 const POKE_LINES = Object.freeze([
   '在呢～',
   '叫我？',
@@ -151,13 +146,6 @@ const TEMPLATE = `
     filter: drop-shadow(0 8px 14px rgba(0, 0, 0, .28));
   }
   .pet.dragging { cursor: grabbing; }
-  .pet.poked { animation: pet-bob .36s ease; }
-  @keyframes pet-bob {
-    0%, 100% { transform: translateY(0); }
-    28% { transform: translateY(-6px); }
-    56% { transform: translateY(0); }
-    78% { transform: translateY(-2px); }
-  }
   .sprite {
     display: block;
     background-repeat: no-repeat;
@@ -1104,7 +1092,7 @@ function poke() {
     acknowledge()
     return
   }
-  bob()
+  play('waving', { once: true })
   pokeLine = POKE_LINES[pokeLineIndex % POKE_LINES.length]
   pokeLineIndex += 1
   pokeLineUntil = performance.now() + POKE_LINE_MS
@@ -1115,15 +1103,6 @@ function poke() {
     pokeLine = ''
     renderBubble()
   }, POKE_LINE_MS)
-}
-
-/** A small in-place hop: no row switch, so the drawing never changes. */
-function bob() {
-  if (!petEl) return
-  petEl.classList.remove('poked')
-  // Reading layout restarts the CSS animation when she is poked repeatedly.
-  void petEl.offsetWidth
-  petEl.classList.add('poked')
 }
 
 function updateLook(event) {

@@ -788,7 +788,7 @@ test('the bubble drops below the pet when there is no room above', async () => {
   assert.equal(bubble.style.left, '400px')
 })
 
-﻿﻿﻿test('poking her bobs in place instead of switching to the waving row', () => {
+test('poking her waves the raised hand without changing the body', () => {
   const { env } = applyWidget()
   const shadow = env.body.children[0]._shadow
   const pet = shadow.querySelector('.pet')
@@ -796,13 +796,22 @@ test('the bubble drops below the pet when there is no room above', async () => {
   const bubbleDetail = shadow.querySelector('.bubble-detail')
   env.pump(0)
 
-  const before = sprite.style.backgroundPosition
+  assert.ok(sprite.style.backgroundPosition.endsWith(' 0px'), 'starts on the idle row')
   pet.dispatch('pointerdown', { button: 0, pointerId: 1, clientX: 200, clientY: 200, preventDefault() {} })
   env.fireWindow('pointerup', { pointerId: 1 })
+  env.pump(0)
 
-  assert.equal(pet.classList.contains('poked'), true, 'the hop is a class on .pet, not a sprite row')
-  assert.equal(sprite.style.backgroundPosition, before, 'the idle drawing stays, so nothing changes shape')
+  assert.equal(sprite.style.backgroundPosition, '0px -468px', 'the wave is the waving row: 3 * 156 px')
   assert.equal(bubbleDetail.textContent, '在呢～')
+
+  env.advanceClock(200)
+  env.pump(0)
+  assert.equal(sprite.style.backgroundPosition, '-144px -468px', 'the second wave cell')
+
+  env.advanceClock(680)
+  env.pump(0)
+  env.pump(16)
+  assert.ok(sprite.style.backgroundPosition.endsWith(' 0px'), 'back to the idle row when the wave ends')
 })
 
 test('the poke line steps through her answers and clears on its own', () => {

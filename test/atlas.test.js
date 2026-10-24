@@ -44,7 +44,7 @@ test('animation table uses the Codex row and frame counts', () => {
   // The mirrored pixels are now in the asset's native right-run row.
   assert.deepEqual(ANIMATIONS.runningRight, { row: 1, frames: 8, interval: 120 })
   assert.deepEqual(ANIMATIONS.runningLeft, { row: 2, frames: 8, interval: 120 })
-  assert.deepEqual(ANIMATIONS.waving, { row: 3, frames: 4, interval: 140 })
+  assert.deepEqual(ANIMATIONS.waving, { row: 3, frames: 4, interval: 200 })
   assert.deepEqual(ANIMATIONS.jumping, { row: 4, frames: 5, interval: 140 })
   assert.deepEqual(ANIMATIONS.failed, { row: 5, frames: 8, interval: 140 })
   assert.deepEqual(ANIMATIONS.waiting, { row: 6, frames: 6, interval: 150 })
