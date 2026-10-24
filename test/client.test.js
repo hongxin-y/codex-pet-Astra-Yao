@@ -226,6 +226,10 @@ function createSandbox() {
       }
       return undefined
     },
+    /** Dispatch a window-level event, e.g. pointermove. */
+    fireWindow(type, event = {}) {
+      for (const handler of windowListeners.get(type) ?? []) handler(event)
+    },
     load() {
       assert.ok(capture, 'the bundle must call window.__ModuleLoader__.load')
       return capture
@@ -521,4 +525,83 @@ test('the speed setting scales the frame interval', async () => {
   await handle.patch({ speed: 1.6 })
   env.pump(100)
   assert.equal(sprite.style.backgroundPosition, '-144px 0px', 'double speed advances after 80 ms')
+})
+
+// ---------------------------------------------------------------------------
+// Atlas quirks: this sheet has two rows that cannot be played as drawn
+// ---------------------------------------------------------------------------
+
+test('dragging right mirrors the clean left-run row instead of the crouched row', () => {
+  const { env } = applyWidget()
+  const shadow = env.body.children[0]._shadow
+  const pet = shadow.querySelector('.pet')
+  const sprite = shadow.querySelector('.sprite')
+  env.pump(0)
+
+  pet.dispatch('pointerdown', { button: 0, pointerId: 1, clientX: 200, clientY: 200, preventDefault() {} })
+  env.fireWindow('pointermove', { clientX: 260, clientY: 200 })
+  env.pump(0)
+  assert.equal(sprite.style.backgroundPosition, '0px -312px', 'row 2 is the left run, mirrored')
+  assert.equal(sprite.style.transform, 'scaleX(-1)')
+
+  env.fireWindow('pointermove', { clientX: 140, clientY: 200 })
+  env.pump(0)
+  assert.equal(sprite.style.backgroundPosition, '0px -312px')
+  assert.equal(sprite.style.transform, '', 'running left drops the mirror again')
+})
+
+test('the failed loop skips the lying frame so the pet never flops over', async () => {
+  const { env } = applyWidget()
+  const shadow = env.body.children[0]._shadow
+  const sprite = shadow.querySelector('.sprite')
+  const handle = env.sandbox.__DSH_PET_ASTRA_YAO__
+  env.pump(0)
+
+  await feed(env, {
+    active: true,
+    sessionId: 's1',
+    state: 'error',
+    activity: '',
+    waitingKind: '',
+    errorKind: 'error',
+    errorText: 'boom',
+    title: null,
+    project: null,
+    pulse: null,
+  })
+  assert.equal(handle.snapshot.baseState, 'error')
+
+  const seen = []
+  for (let index = 0; index < 7; index += 1) {
+    env.pump(index === 0 ? 0 : 140)
+    seen.push(sprite.style.backgroundPosition)
+  }
+  assert.deepEqual(seen, [
+    '0px -780px',
+    '-144px -780px',
+    '-288px -780px',
+    '-432px -780px',
+    '-576px -780px',
+    '-864px -780px',
+    '-1008px -780px',
+  ])
+})
+
+test('pointer look only engages near the pet, so a far cursor leaves idle animating', () => {
+  const { env } = applyWidget()
+  const sprite = env.body.children[0]._shadow.querySelector('.sprite')
+  env.pump(0)
+  // The fake element reports a 144x156 box at the origin, so its centre is (72, 78).
+  env.fireWindow('pointermove', { clientX: 72 + 400, clientY: 78 })
+  env.pump(200)
+  assert.equal(sprite.style.backgroundPosition, '-144px 0px', 'idle keeps animating when the cursor is far')
+
+  env.fireWindow('pointermove', { clientX: 72 + 120, clientY: 78 })
+  env.pump(0)
+  assert.equal(sprite.style.backgroundPosition, '-576px -1404px', 'a nearby cursor shows the look-right cell')
+
+  env.advanceClock(120)
+  env.fireWindow('pointermove', { clientX: 72 + 400, clientY: 78 })
+  env.pump(0)
+  assert.match(sprite.style.backgroundPosition, / 0px$/u, 'the idle row comes back once the cursor leaves')
 })

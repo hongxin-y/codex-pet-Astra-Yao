@@ -32,14 +32,28 @@ export const LOOK_ROW = 9
 export const LOOK_CELLS = 16
 export const LOOK_STEP_DEGREES = 360 / LOOK_CELLS // 22.5
 
-/** Animation table, matching the Codex desktop pet defaults. */
+/**
+ * Animation table, matching the Codex desktop pet defaults, except for two
+ * quirks of this particular atlas:
+ *
+ *   runningRight  row 1 mixes three kneeling frames (174-189 px tall against
+ *                 198 for the rest) into the cycle, so the pet plays row 2 -
+ *                 which is clean - mirrored instead.
+ *   failed        frame 5 is a lying-down pose; left in the loop the pet flops
+ *                 to the floor and stands back up every second.
+ */
 export const ANIMATIONS = Object.freeze({
   idle: Object.freeze({ row: 0, frames: 6, interval: 160 }),
-  runningRight: Object.freeze({ row: 1, frames: 8, interval: 120 }),
+  runningRight: Object.freeze({ row: 2, frames: 8, interval: 120, flip: true }),
   runningLeft: Object.freeze({ row: 2, frames: 8, interval: 120 }),
   waving: Object.freeze({ row: 3, frames: 4, interval: 140 }),
   jumping: Object.freeze({ row: 4, frames: 5, interval: 140 }),
-  failed: Object.freeze({ row: 5, frames: 8, interval: 140 }),
+  failed: Object.freeze({
+    row: 5,
+    frames: 7,
+    interval: 140,
+    columns: Object.freeze([0, 1, 2, 3, 4, 6, 7]),
+  }),
   waiting: Object.freeze({ row: 6, frames: 6, interval: 150 }),
   running: Object.freeze({ row: 7, frames: 6, interval: 120 }),
   review: Object.freeze({ row: 8, frames: 6, interval: 150 }),
@@ -71,11 +85,19 @@ export function moodAnimation(mood) {
   return MOOD_ANIMATIONS[mood] ?? 'idle'
 }
 
-/** Frame column for an animation at `elapsedMs` since it started (looping). */
+/** Frame column for animation at `elapsedMs` since it started (looping). */
 export function frameIndex(animation, elapsedMs) {
   const { frames, interval } = animationFor(animation)
   if (!Number.isFinite(elapsedMs) || elapsedMs <= 0) return 0
   return Math.floor(elapsedMs / interval) % frames
+}
+
+/** Sheet column of frame `index`; rows with holes list their own columns. */
+export function columnOf(animation, index) {
+  const { frames, columns } = animationFor(animation)
+  const safe = Number.isFinite(index) ? Math.trunc(index) : 0
+  const clamped = Math.max(0, Math.min(frames - 1, safe))
+  return columns ? columns[clamped] : clamped
 }
 
 /** Frame column clamped to the last frame, for one-shot playback. */

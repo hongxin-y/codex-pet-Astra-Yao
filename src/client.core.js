@@ -29,6 +29,10 @@ const PLUGIN_ID = 'dsh-pet-astra-yao'
 const ROOT_ID = 'dsh-pet-astra-yao-root'
 const BASE_WIDTH = 144
 const LOOK_DEADZONE = 56
+// Beyond this radius the pet stops tracking the pointer and returns to its
+// idle loop: the look cells are narrow profile frames, so a cursor parked far
+// away would otherwise freeze the pet in a "smaller" pose forever.
+const LOOK_RANGE = 280
 const CORNER_MARGIN = 24
 const DRAG_THRESHOLD = 5
 const POLL_INTERVAL_MS = 900
@@ -54,6 +58,7 @@ const DEFAULT_CONFIG = Object.freeze({
   paused: false,
   showBubble: true,
   showBubbleUsage: false,
+  lookAtPointer: true,
   posX: null,
   posY: null,
 })
@@ -244,6 +249,7 @@ const TEMPLATE = `
   <label class="row"><span>动画速度</span><input type="range" data-field="speed" min="0.5" max="1.6" step="0.05"></label>
   <label class="row"><span>锁定位置</span><input type="checkbox" data-field="locked"></label>
   <label class="row"><span>左右镜像</span><input type="checkbox" data-field="mirror"></label>
+  <label class="row"><span>跟随光标</span><input type="checkbox" data-field="lookAtPointer"></label>
   <div class="menu-actions">
     <button type="button" data-action="reset">回右下角</button>
     <button type="button" data-action="ack">我知道了</button>
@@ -402,17 +408,36 @@ function placeGhost() {
   ghostEl.style.top = `${Math.round(top + size.height / 2 - 8)}px`
 }
 
-function paint(row, column) {
+function paint(row, column, flip = false) {
   if (!spriteEl) return
   const width = spriteWidth
   if (width <= 0) return
-  if (lastPainted.row === row && lastPainted.column === column && lastPainted.width === width) return
+  const mirrored = Boolean(cfg.mirror) !== Boolean(flip)
+  if (
+    lastPainted.row === row &&
+    lastPainted.column === column &&
+    lastPainted.width === width &&
+    lastPainted.mirrored === mirrored
+  ) {
+    return
+  }
   const cell = geometry(width, row, column)
   spriteEl.style.width = `${cell.width}px`
   spriteEl.style.height = `${cell.height}px`
   spriteEl.style.backgroundSize = cell.backgroundSize
   spriteEl.style.backgroundPosition = cell.backgroundPosition
-  lastPainted = { row, column, width }
+  spriteEl.style.transform = mirrored ? 'scaleX(-1)' : ''
+  lastPainted = { row, column, width, mirrored }
+}
+
+/** Sheet column for frame `index`, honouring rows that skip cells. */
+function frameColumn(animation, index) {
+  const safe = Math.max(0, Math.min(animation.frames - 1, Math.trunc(Number(index) || 0)))
+  return animation.columns ? animation.columns[safe] : safe
+}
+
+function paintFrame(animation, index) {
+  paint(animation.row, frameColumn(animation, index), animation.flip)
 }
 
 function play(name, options = {}) {
@@ -423,6 +448,8 @@ function play(name, options = {}) {
     row: animation.row,
     frames: animation.frames,
     interval,
+    columns: animation.columns ?? null,
+    flip: animation.flip === true,
     startedAt: performance.now(),
     once: Boolean(options.once),
   }
@@ -479,13 +506,13 @@ function frameLoop(now) {
   rafId = requestAnimationFrame(frameLoop)
   if (!currentAnimation || !spriteEl) return
   if (cfg.paused) {
-    paint(currentAnimation.row, 0)
+    paintFrame(currentAnimation, 0)
     return
   }
   const elapsed = now - currentAnimation.startedAt
   if (currentAnimation.once) {
     const column = Math.min(currentAnimation.frames - 1, Math.max(0, Math.floor(elapsed / currentAnimation.interval)))
-    paint(currentAnimation.row, column)
+    paintFrame(currentAnimation, column)
     if (column >= currentAnimation.frames - 1) {
       currentAnimation = null
       playBase()
@@ -497,7 +524,7 @@ function frameLoop(now) {
     return
   }
   const column = Math.floor(elapsed / currentAnimation.interval) % currentAnimation.frames
-  paint(currentAnimation.row, column)
+  paintFrame(currentAnimation, column)
 }
 
 function setState(nextState) {
@@ -683,7 +710,9 @@ function applyConfig(next, options = {}) {
   if (sizeChanged) lastPainted = { row: -1, column: -1, width: 0 }
 
   petEl.style.opacity = String(clamp(Number(cfg.opacity) || 1, 0.05, 1))
-  spriteEl.style.transform = cfg.mirror ? 'scaleX(-1)' : ''
+  const mirrored = Boolean(cfg.mirror) !== Boolean(currentAnimation?.flip)
+  spriteEl.style.transform = mirrored ? 'scaleX(-1)' : ''
+  lastPainted = { ...lastPainted, row: -1, mirrored }
 
   const hidden = Boolean(cfg.hidden)
   petEl.hidden = hidden
@@ -717,6 +746,7 @@ function syncMenu() {
   menuEl.querySelector('[data-field="hidden"]').checked = !cfg.hidden
   menuEl.querySelector('[data-field="locked"]').checked = Boolean(cfg.locked)
   menuEl.querySelector('[data-field="mirror"]').checked = Boolean(cfg.mirror)
+  menuEl.querySelector('[data-field="lookAtPointer"]').checked = cfg.lookAtPointer !== false
   menuEl.querySelector('[data-field="showBubble"]').checked = cfg.showBubble !== false
   menuEl.querySelector('[data-field="showBubbleUsage"]').checked = Boolean(cfg.showBubbleUsage)
   menuEl.querySelector('[data-field="scale"]').value = String(cfg.scale)
@@ -860,7 +890,7 @@ function onPointerDown(event) {
     originLeft: rect.left,
     originTop: rect.top,
     moved: false,
-    direction: 'runningRight',
+    direction: null,
   }
   petEl.classList.add('dragging')
   closeMenu()
@@ -879,9 +909,13 @@ function onPointerMove(event) {
     if (!drag.moved && Math.abs(dx) + Math.abs(dy) > DRAG_THRESHOLD) {
       drag.moved = true
       customPosition = true
-      play(dx >= 0 ? 'runningRight' : 'runningLeft')
     }
     if (drag.moved) {
+      const direction = dx >= 0 ? 'runningRight' : 'runningLeft'
+      if (drag.direction !== direction) {
+        drag.direction = direction
+        play(direction)
+      }
       place(drag.originLeft + dx, drag.originTop + dy)
       if (ghostEl) placeGhost()
     }
@@ -919,7 +953,7 @@ function poke() {
 }
 
 function updateLook(event) {
-  if (!petEl || cfg.hidden || cfg.paused) {
+  if (!petEl || cfg.hidden || cfg.paused || cfg.lookAtPointer === false) {
     lookCell = null
     return
   }
@@ -929,7 +963,8 @@ function updateLook(event) {
   const rect = petEl.getBoundingClientRect()
   const dx = event.clientX - (rect.left + rect.width / 2)
   const dy = event.clientY - (rect.top + rect.height / 2)
-  if (Math.hypot(dx, dy) < LOOK_DEADZONE) {
+  const distance = Math.hypot(dx, dy)
+  if (distance < LOOK_DEADZONE || distance > LOOK_RANGE) {
     lookCell = null
     return
   }
@@ -966,7 +1001,13 @@ function onMenuInput(event) {
     sendPatch({ hidden: !event.target.checked })
     return
   }
-  if (field === 'locked' || field === 'mirror' || field === 'showBubble' || field === 'showBubbleUsage') {
+  if (
+    field === 'locked' ||
+    field === 'mirror' ||
+    field === 'showBubble' ||
+    field === 'showBubbleUsage' ||
+    field === 'lookAtPointer'
+  ) {
     sendPatch({ [field]: event.target.checked })
     return
   }

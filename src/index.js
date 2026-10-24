@@ -66,6 +66,7 @@ export const Config = Schema && Schema.object({
   paused: Schema.boolean().default(false).description('Pause the frame animation').volatile(),
   showBubble: Schema.boolean().default(true).description('Show the status bubble above the pet').volatile(),
   showBubbleUsage: Schema.boolean().default(false).description('Show the DeepSeek balance in the bubble').volatile(),
+  lookAtPointer: Schema.boolean().default(true).description('Turn the pet toward the pointer when it is nearby').volatile(),
   includeSubagents: Schema.boolean().default(false).description('Let subagent sessions drive the pet state').volatile(),
   posX: Schema.number().default(null).description('Saved horizontal position in CSS pixels (null = default corner)').volatile(),
   posY: Schema.number().default(null).description('Saved vertical position in CSS pixels (null = default corner)').volatile(),
