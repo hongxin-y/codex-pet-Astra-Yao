@@ -9,6 +9,12 @@ DeepSeek Harness（DSH）可以识别的插件：装进 profile 之后，Astra Y
 - 形态：一个标准的 DSH 插件包（`package.json` 里的 `dsh.bundle` + `dsh.client`），
   服务端一半负责会话状态与 HTTP 接口，浏览器一半负责把 sprite 画到页面上
 
+> **English:** Astra Yao is a Codex v2 sprite-atlas pet for the DeepSeek Harness web GUI. One 1536×2288
+> atlas (8×11 frames of 192×208) drives nine animations; the server half follows session events, so the pet
+> idles, thinks, runs while tools are working, waits on approvals and lies down on errors. The browser half
+> paints it in a shadow-root widget with 16-direction pointer look, drag-to-move and a right-click size menu.
+> Install with `dsh plugin --profile desktop add <path-to-this-repo>`.
+
 ## 目录
 
 ```text
@@ -26,6 +32,7 @@ pet-astra-yao/
 |   `-- verify.mjs        # 安装前自检：清单、补丁、bundle、atlas
 |-- lib/client.js         # 构建产物（已提交，DSH 启动时直接加载）
 |-- test/                 # node:test 单测（atlas / state / config / client / host）
+|-- assets/icon-180.png   # 插件市场图标（从图集待机帧裁出来）
 |-- pet.json              # Codex 宠物清单（保留，Codex 端仍可用）
 |-- spritesheet.webp      # 图集，同时被 DSH 插件以 /assets 接口提供
 |-- USAGE.md              # 原 Codex 桌面端安装说明
@@ -42,8 +49,8 @@ DSH 的插件是「profile 里的一个依赖 + 一条 bundle 记录」。本仓
 dsh plugin --profile desktop add D:\Repos\pet-astra-yao
 ```
 
-这一步只把包装进 profile 的 `node_modules`；再让 profile 认识它——在
-`%USERPROFILE%\.dsh\profiles\desktop\package.json` 的 `dsh.profile.bundles` 数组末尾追加包名：
+这一步把包装进 profile 的 `node_modules`，并把包名追加到 profile 的 `dsh.profile.bundles`。
+如果你用的 DSH 版本没自动追加，就在 `%USERPROFILE%\.dsh\profiles\desktop\package.json` 里手动补一行：
 
 ```json
 "dsh": {
@@ -59,6 +66,15 @@ dsh plugin --profile desktop add D:\Repos\pet-astra-yao
 
 打开 DSH Web 的「设置 → 插件」，用「从本地路径安装」填本仓库的绝对路径，装完点「立即启用」。
 插件页会读到 `cordis.patch.yml`，把配置渲染成表单。
+
+**方式三：直接从 GitHub 装（不用先克隆）**
+
+```powershell
+dsh plugin --profile desktop add github:hongxin-y/codex-pet-Astra-Yao
+```
+
+pnpm 会拉仓库、跑 `prepare` 重新生成 `lib/client.js`。这样装的是独立副本，改代码不会热更新，
+开发时用方式一（`link:` 指向工作区）。
 
 装好后刷新页面：右下角出现 Astra Yao 即成功。它和别的桌宠插件（例如 `dsh-pet-remielle`）可以同时存在，
 各自记住自己的位置。

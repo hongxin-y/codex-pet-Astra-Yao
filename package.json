@@ -15,6 +15,7 @@
   "files": [
     "src/",
     "lib/client.js",
+    "assets/icon-180.png",
     "spritesheet.webp",
     "pet.json",
     "cordis.patch.yml",
@@ -37,14 +38,20 @@
   "engines": {
     "node": ">=22.19"
   },
-  "dependencies": {
-    "@deepseek-ai/schemastery": "^3.18.4"
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hongxin-y/codex-pet-Astra-Yao.git"
   },
+  "homepage": "https://github.com/hongxin-y/codex-pet-Astra-Yao#readme",
   "peerDependencies": {
-    "@deepseek-ai/cordis": "^4.0.1"
+    "@deepseek-ai/cordis": ">=4.0.1-rc.1 <4.0.5-0 || >=4.0.5-0 <5.0.0-0",
+    "@deepseek-ai/schemastery": ">=3.18.1-rc.1 <3.18.5-0 || >=3.18.5-0 <4.0.0-0"
   },
   "peerDependenciesMeta": {
     "@deepseek-ai/cordis": {
+      "optional": true
+    },
+    "@deepseek-ai/schemastery": {
       "optional": true
     }
   },
