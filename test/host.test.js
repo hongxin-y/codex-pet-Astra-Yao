@@ -1,6 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import {
   API_PREFIX,
   ENDPOINTS,
@@ -110,10 +112,10 @@ function createStore(initial = normalizeConfig({ scale: 1.25 })) {
   }
 }
 
-function createHandlersFixture() {
+function createHandlersFixture(assets) {
   const tracker = createTrackerStub()
   const store = createStore()
-  return { tracker, store, handlers: createHandlers({ tracker, store, version: '9.9.9' }) }
+  return { tracker, store, handlers: createHandlers({ tracker, store, version: '9.9.9', assets }) }
 }
 
 // ---------------------------------------------------------------------------
@@ -192,7 +194,8 @@ test('asset endpoints serve the committed spritesheet and manifest', async () =>
   await handlers.serveSpritesheet(request(), sheet)
   assert.equal(sheet.statusCode, 200)
   assert.equal(sheet.headers['content-type'], 'image/webp')
-  assert.equal(sheet.headers['cache-control'], 'private, max-age=3600')
+  assert.match(String(sheet.headers['cache-control']), /no-cache/)
+  assert.match(String(sheet.headers.etag), /^"\d+-\d+"$/)
   const bytes = sheet.payload
   assert.equal(bytes.length, Number(sheet.headers['content-length']))
   assert.equal(bytes.toString('ascii', 0, 4), 'RIFF')
@@ -204,6 +207,46 @@ test('asset endpoints serve the committed spritesheet and manifest', async () =>
   const pet = JSON.parse(String(manifest.payload))
   assert.equal(pet.id, 'astra-yao')
   assert.equal(pet.spriteVersionNumber, 2)
+})
+
+test('assets revalidate with an etag so a page reload sees a replaced atlas', async () => {
+  const { handlers } = createHandlersFixture()
+
+  const first = response()
+  await handlers.serveSpritesheet(request(), first)
+  const etag = String(first.headers.etag)
+
+  const cached = response()
+  await handlers.serveSpritesheet(request({ headers: { 'if-none-match': etag } }), cached)
+  assert.equal(cached.statusCode, 304)
+  assert.equal(cached.payload, undefined)
+
+  const stale = response()
+  await handlers.serveSpritesheet(request({ headers: { 'if-none-match': '"1-1"' } }), stale)
+  assert.equal(stale.statusCode, 200)
+})
+
+test('a replaced spritesheet is picked up without restarting the host', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'dsh-pet-astra-yao-assets-'))
+  const file = join(dir, 'sheet.webp')
+  try {
+    await writeFile(file, 'RIFF-old-bytes')
+    const { handlers } = createHandlersFixture({ spritesheet: file })
+
+    const before = response()
+    await handlers.serveSpritesheet(request(), before)
+    assert.equal(String(before.payload), 'RIFF-old-bytes')
+    const oldEtag = String(before.headers.etag)
+
+    await writeFile(file, 'RIFF-new-bytes-of-a-different-length')
+    const after = response()
+    await handlers.serveSpritesheet(request({ headers: { 'if-none-match': oldEtag } }), after)
+    assert.equal(after.statusCode, 200)
+    assert.equal(String(after.payload), 'RIFF-new-bytes-of-a-different-length')
+    assert.notEqual(String(after.headers.etag), oldEtag)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
 })
 
 test('guardHandler blocks non-loopback callers and reports handler failures', async () => {

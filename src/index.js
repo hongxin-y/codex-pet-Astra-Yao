@@ -16,7 +16,7 @@
  * Nothing here is model-facing: no tools, no prompts, no tokens.
  */
 
-import { readFile } from 'node:fs/promises'
+import { readFile, stat } from 'node:fs/promises'
 import { readFileSync } from 'node:fs'
 import { localHostOk } from './local-access.js'
 import { createTracker } from './state.js'
@@ -114,13 +114,40 @@ export function createHandlers({ tracker, store, assets = {}, version = VERSION,
   const manifestFile = assets.manifest ?? new URL('../pet.json', import.meta.url)
   const fileCache = new Map()
 
+  /**
+   * Asset reads are cached by `mtime` + size, so replacing `spritesheet.webp`
+   * on disk is picked up by the running host on the next request instead of
+   * serving the bytes that were read at boot.
+   */
   async function readAsset(file) {
     const key = String(file)
+    let stats = null
+    try {
+      stats = await stat(file)
+    } catch {
+      stats = null
+    }
+    const version = stats ? `${Math.round(stats.mtimeMs)}-${stats.size}` : 'missing'
     const cached = fileCache.get(key)
-    if (cached) return cached
-    const data = await readFile(file)
-    fileCache.set(key, data)
-    return data
+    if (cached && cached.version === version) return cached
+    const entry = { version, etag: `"${version}"`, data: await readFile(file) }
+    fileCache.set(key, entry)
+    return entry
+  }
+
+  function sendAsset(req, res, entry, contentType) {
+    const headers = {
+      'content-type': contentType,
+      etag: entry.etag,
+      'cache-control': 'private, no-cache',
+    }
+    if (String(req?.headers?.['if-none-match'] ?? '') === entry.etag) {
+      res.writeHead(304, headers)
+      res.end()
+      return
+    }
+    res.writeHead(200, { ...headers, 'content-length': entry.data.length })
+    res.end(entry.data)
   }
 
   function serveState(_req, res) {
@@ -189,24 +216,12 @@ export function createHandlers({ tracker, store, assets = {}, version = VERSION,
     jsonResponse(res, 200, { ok: payload.ok === true, balance: payload, serverTime: Date.now() })
   }
 
-  async function serveSpritesheet(_req, res) {
-    const data = await readAsset(spriteFile)
-    res.writeHead(200, {
-      'content-type': 'image/webp',
-      'cache-control': 'private, max-age=3600',
-      'content-length': data.length,
-    })
-    res.end(data)
+  async function serveSpritesheet(req, res) {
+    sendAsset(req, res, await readAsset(spriteFile), 'image/webp')
   }
 
-  async function serveManifest(_req, res) {
-    const data = await readAsset(manifestFile)
-    res.writeHead(200, {
-      'content-type': 'application/json; charset=utf-8',
-      'cache-control': 'private, max-age=3600',
-      'content-length': data.length,
-    })
-    res.end(data)
+  async function serveManifest(req, res) {
+    sendAsset(req, res, await readAsset(manifestFile), 'application/json; charset=utf-8')
   }
 
   return { serveState, serveConfig, serveAck, serveBalance, serveSpritesheet, serveManifest }

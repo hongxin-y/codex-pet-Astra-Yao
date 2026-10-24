@@ -98,6 +98,10 @@ pnpm 会拉仓库、跑 `prepare` 重新生成 `lib/client.js`。这样装的是
 装好后刷新页面：右下角出现 Astra Yao 即成功。它和别的桌宠插件（例如 `dsh-pet-remielle`）可以同时存在，
 各自记住自己的位置。
 
+改完代码或换了 `spritesheet.webp` 之后：重启一次 DSH（host 与浏览器两半都在启动时装载），
+之后刷新页面即可。图集文件本身按 `mtime` + `ETag` 校验，替换图片不需要清浏览器缓存；
+只有 host 代码变更才需要重启。
+
 ## 交互
 
 | 操作 | 效果 |
@@ -184,8 +188,8 @@ pnpm 会拉仓库、跑 `prepare` 重新生成 `lib/client.js`。这样装的是
 | `GET` `PATCH` `POST` | `/config` | 读配置 / 合并式改配置（未知字段 400） |
 | `POST` | `/ack` | 清掉报错状态（桌宠「我知道了」） |
 | `GET` | `/balance` | 余额 + 今日消耗（`?refresh=1` 跳过 60 秒缓存） |
-| `GET` | `/spritesheet` | 图集本体，`image/webp` |
-| `GET` | `/manifest` | `pet.json` |
+| `GET` | `/spritesheet` | 图集本体，`image/webp`（带 `ETag`，按 `mtime` 校验，换图即生效） |
+| `GET` | `/manifest` | `pet.json`（同样带 `ETag`） |
 
 客户端不依赖任何前端框架，只用 DSH 的基线模块，所以 `dsh.client.inject` 是空数组。
 
