@@ -17,11 +17,29 @@ const ROOT_ID = 'dsh-pet-astra-yao-root'
 function fakeElement(tagName) {
   const element = {
     tagName: String(tagName).toUpperCase(),
-    style: {},
+    style: {
+      setProperty(name, value) {
+        element.style[name] = value
+      },
+      getPropertyValue(name) {
+        return element.style[name] ?? ''
+      },
+    },
     dataset: {},
     hidden: false,
     children: [],
-    classList: { add() {}, remove() {} },
+    classList: {
+      values: new Set(),
+      add(...names) {
+        for (const name of names) element.classList.values.add(name)
+      },
+      remove(...names) {
+        for (const name of names) element.classList.values.delete(name)
+      },
+      contains(name) {
+        return element.classList.values.has(name)
+      },
+    },
     listeners: new Map(),
     parentNode: null,
     _box: { left: 0, top: 0, width: 144, height: 156 },
@@ -604,4 +622,56 @@ test('pointer look only engages near the pet, so a far cursor leaves idle animat
   env.fireWindow('pointermove', { clientX: 72 + 400, clientY: 78 })
   env.pump(0)
   assert.match(sprite.style.backgroundPosition, / 0px$/u, 'the idle row comes back once the cursor leaves')
+})
+
+// ---------------------------------------------------------------------------
+// Status bubble placement
+// ---------------------------------------------------------------------------
+
+const WORKING_SESSION = {
+  active: true,
+  sessionId: 's1',
+  state: 'working',
+  activity: 'shell',
+  waitingKind: '',
+  errorKind: '',
+  errorText: '',
+  title: '修 bug',
+  project: 'pet-astra-yao',
+  pulse: null,
+}
+
+test('the bubble anchors to the pet side and points its tail at the pet', async () => {
+  const { env } = applyWidget()
+  const shadow = env.body.children[0]._shadow
+  const pet = shadow.querySelector('.pet')
+  const bubble = shadow.querySelector('.bubble')
+
+  // Right half of the viewport: the bubble's right edge tracks the pet's right edge.
+  pet._box = { left: 1000, top: 600, width: 144, height: 156 }
+  await feed(env, WORKING_SESSION)
+  assert.equal(bubble.style.left, '1000px') // 1144 - 144 (fake bubble width)
+  assert.equal(bubble.style.top, '434px') // 600 - 156 - 10
+  assert.equal(bubble.style['--tail-x'], '72px') // pet centre 1072 - left
+  assert.equal(bubble.classList.contains('below'), false)
+
+  // Left half: it flips to the pet's left edge instead of drifting away.
+  pet._box = { left: 100, top: 300, width: 144, height: 156 }
+  await feed(env, WORKING_SESSION)
+  assert.equal(bubble.style.left, '100px')
+  assert.equal(bubble.style.top, '134px')
+  assert.equal(bubble.style['--tail-x'], '72px')
+})
+
+test('the bubble drops below the pet when there is no room above', async () => {
+  const { env } = applyWidget()
+  const shadow = env.body.children[0]._shadow
+  const pet = shadow.querySelector('.pet')
+  const bubble = shadow.querySelector('.bubble')
+
+  pet._box = { left: 400, top: 40, width: 144, height: 156 }
+  await feed(env, { ...WORKING_SESSION, state: 'thinking', activity: '' })
+  assert.equal(bubble.classList.contains('below'), true)
+  assert.equal(bubble.style.top, '206px') // 40 + 156 + 10
+  assert.equal(bubble.style.left, '400px')
 })
