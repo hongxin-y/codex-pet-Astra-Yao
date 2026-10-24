@@ -163,7 +163,7 @@ pnpm 会拉仓库、跑 `prepare` 重新生成 `lib/client.js`。这样装的是
 | `opacity` | `1` | 不透明度，0.3–1 |
 | `speed` | `1` | 动画速度，0.5–1.6（0.5 最慢，1.6 最快） |
 | `mirror` | `false` | 左右镜像 |
-| `lookAtPointer` | `false` | 光标靠近时看向光标；默认关闭，因为第 9–10 行是另一套比例（见下方素材说明） |
+| `lookAtPointer` | `false` | 光标靠近时看向光标；保持默认关闭，可在菜单中开启。新版朝向帧已统一比例，头眼转向幅度较轻 |
 | `locked` | `false` | 锁定位置，禁止拖动 |
 | `hidden` | `false` | 隐藏（留一个小圆点） |
 | `paused` | `false` | 暂停逐帧动画，只画当前帧 |
@@ -196,10 +196,12 @@ pnpm 会拉仓库、跑 `prepare` 重新生成 `lib/client.js`。这样装的是
 
 ```powershell
 npm run build     # 改完 src/client.core.js 后重新生成 lib/client.js
+npm run build:atlas # 从已审阅的动作源图重新打包图集（开发依赖 sharp）
 npm run verify    # 自检：清单字段、补丁行、bundle、图集尺寸（1536×2288 / v2）
-npm test          # node:test：atlas / config / state / balance / client / host / server 共 65 个用例
+npm test          # node:test：atlas / config / state / balance / client / host / server
+npm run test:atlas # Pillow：图集审计脚本的回归用例
 
-# 换图集之后先跑这个（需要 Pillow）：帧数、行内角色高度、脚底基线、头部密度
+# 换图集之后先跑这个（需要 Pillow）：格式、透明度、连续帧数、含道具的占用边界
 python scripts/audit-atlas.py spritesheet.webp
 ```
 
@@ -207,7 +209,8 @@ python scripts/audit-atlas.py spritesheet.webp
 再一起提交。
 
 要重新生成图集，把 [`docs/atlas-brief.md`](docs/atlas-brief.md) 直接发给画图方：里面写了交付规格、
-11 行各自该画什么、现有图集的实测缺陷（带格子坐标），以及本脚本的验收标准（输出 `OK` 才算过）。
+11 行各自该画什么，以及结构检查与动画目检的验收范围。`OK` 只代表结构通过，
+不能证明人物比例、脚掌接地或动作连贯。此次修复方式及复查记录见 [`docs/atlas-review.md`](docs/atlas-review.md)。
 
 自己写桌宠时可以直接复用 `src/atlas.js`：它只描述 Codex atlas 的几何与动画表（行、帧数、间隔、朝向），
 不碰 DOM，也没有依赖。
@@ -222,11 +225,18 @@ python scripts/audit-atlas.py spritesheet.webp
 像素美术与角色形象来自原仓库，角色「Astra Yao（耀嘉音）」及相关设定的权利归原权利人所有；
 本仓库只做桌宠资源的整理与 DSH 插件化，未附带额外许可证。
 
-图集是生成式工具产出的，有几处与标准 Codex 图集不一致，插件里做了规避（见 `src/atlas.js`）：
+图集原先存在跑动混跪姿、失败突然躺平、工作中站立比手势、跨行比例变化等问题。
+现已修复图片并恢复原生行播放（见 `src/atlas.js`），Codex 直接使用图片时也能得到修复后的动作：
 
-| 位置 | 问题 | 处理 |
+| 位置 | 当前处理 | 播放 |
 | --- | --- | --- |
-| 第 1 行（向右跑） | 第 2、3、6 帧是跪姿，比其他帧矮约 12%，循环播放像在「忽大忽小」 | 不用这一行，改用干净的第 2 行（向左跑）水平镜像，`flip: true` |
-| 第 5 行第 5 帧（failed） | 唯一一帧躺平姿势，混在 8 帧循环里会让桌宠每秒趴下一次 | `columns: [0,1,2,3,4,6,7]`，跳过该帧 |
-| 第 8 行（review，思考） | 六帧里最后两帧是低头闭眼的「点头」，按 150 ms 循环等于每秒点一次头 | 只取托腮的第 2 帧和闭眼第 3 帧，`columns: [2,3,2]`、`interval: 620`，变成慢慢眨眼 |
-| 第 9–10 行（16 朝向） | 这一套是单独画的：头明显更大、身体更短（实测角色高 194 px 对第 0 行的 187 px，头身比不同），侧脸还被压窄到 97–124 px | `lookAtPointer` 默认关闭，待机只用第 0 行；想开着看向光标也能在菜单里打开 |
+| 第 1 行（向右跑） | 将干净的第 2 行逐格镜像写入图片 | 原生第 1 行，8 帧；不再额外 `flip` |
+| 第 5 行（failed） | 整行重绘为站立低落、叹气，消除站立/跪坐/躺平混杂 | 完整 8 帧，不跳过第 5 列 |
+| 第 7 行（工作中） | 复用第 2 行的 6 个不同跑步相位 `[0,1,3,4,5,7]` | 6 帧，120 ms |
+| 第 8 行（review） | 整行统一为抬头托腮、目光变化和眨眼 | 完整 6 帧，360 ms |
+| 第 9–10 行（16 朝向） | 按母版比例重新生成站立注视姿势，头眼变化较轻 | `lookAtPointer` 继续默认关闭，可选开启 |
+
+第 0、2、3、4、6 行保留原有可见像素。新绘动作使用内置 imagegen，
+提示词保存在 [`docs/atlas-generation-prompts.md`](docs/atlas-generation-prompts.md)，
+源图位于 `assets/atlas-source/`。打包脚本统一处理源图尺度、透明边缘和网格定位，输出 lossless WebP；
+各姿势不单独拉伸，也不裁切人物。

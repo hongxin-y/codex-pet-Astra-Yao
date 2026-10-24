@@ -1,71 +1,57 @@
 #!/usr/bin/env python3
-"""Audit a Codex v2 pet spritesheet against the Atlas Astra Yao contract.
+"""Check atlas structure and occupied bounds; animation quality needs visual review.
 
-Usage:
-    python scripts/audit-atlas.py [spritesheet.webp] [--json]
-
-The script only needs Pillow. It prints one line per row (frames, median
-character height, baseline, outliers) and a final verdict, so whoever draws the
-atlas can see immediately whether a regenerated sheet is consistent. Exit code
-is 1 when any hard rule fails, so it can be wired into CI later.
-
-Rules checked
--------------
-sheet     1536x2288 px, RGBA webp/png, 8 columns x 11 rows of 192x208.
-frames    each row must expose the expected number of non-empty cells.
-baseline  for every standing row the character's feet must sit on the same
-          pixel row (+/- 2 px) as row 0; row 5 column 5 may lie down.
-height    inside a row the alpha bounding-box height must stay within 3 % of
-          the row median - this is what "some frames look smaller" means.
-head      the alpha mass in the top 90 px of each cell is compared across rows;
-          a row whose head mass differs by more than 15 % from row 0 has a
-          different head/body ratio, which reads as a different drawing.
+Usage: python scripts/audit-atlas.py [spritesheet.webp] [--json]
+Requires Pillow. Coordinates are zero based; bounding-box bottoms are exclusive.
+The bounds include hair and the microphone staff: they are NOT body measurements,
+shoe positions, or a head/body ratio. A successful audit is only a structural pass.
 """
 
 from __future__ import annotations
 
+import argparse
 import json
 import statistics
-import sys
 from pathlib import Path
 
 try:
     from PIL import Image
-except ImportError:  # pragma: no cover - the artist machine may not have Pillow
-    sys.exit("Pillow is required: python -m pip install pillow")
+except ImportError:
+    raise SystemExit("Pillow is required: python -m pip install pillow")
 
-CELL_WIDTH = 192
-CELL_HEIGHT = 208
-COLUMNS = 8
-ROWS = 11
-SHEET_WIDTH = CELL_WIDTH * COLUMNS
-SHEET_HEIGHT = CELL_HEIGHT * ROWS
-
-# row -> (codex name, expected painted cells, may contain a non-standing cell)
-EXPECTED = {
-    0: ("idle", 7, False),
-    1: ("runningRight", 8, False),
-    2: ("runningLeft", 8, False),
-    3: ("waving", 4, False),
-    4: ("jumping", 5, False),
-    5: ("failed", 8, True),
-    6: ("waiting", 6, False),
-    7: ("running", 6, False),
-    8: ("review", 6, False),
-    9: ("look 000-157.5", 8, False),
-    10: ("look 180-337.5", 8, False),
-}
-
-HEIGHT_TOLERANCE = 0.03
+CELL_WIDTH, CELL_HEIGHT = 192, 208
+COLUMNS, ROWS = 8, 11
+SHEET_WIDTH, SHEET_HEIGHT = CELL_WIDTH * COLUMNS, CELL_HEIGHT * ROWS
+MAX_BYTES = 20 * 1024 * 1024
+BASELINE = 203
 BASELINE_TOLERANCE = 2
-HEAD_MASS_TOLERANCE = 0.15
+HEIGHT_TOLERANCE = 0.03
+RUN_HEIGHT_TOLERANCE = 0.08
+
+# The optional seventh idle drawing is not played by the six-frame idle cycle.
+# Look poses may be omitted only as a complete set, never half a set.
+EXPECTED = {
+    0: ("idle", (6, 7)),
+    1: ("runningRight", (8,)),
+    2: ("runningLeft", (8,)),
+    3: ("waving", (4,)),
+    4: ("jumping", (5,)),
+    5: ("failed", (8,)),
+    6: ("waiting", (6,)),
+    7: ("running", (6,)),
+    8: ("review", (6,)),
+    9: ("look 000-157.5", (0, 8)),
+    10: ("look 180-337.5", (0, 8)),
+}
+RUN_ROWS = (1, 2, 7)
+GROUNDED_ROWS = (0, 3, 5, 6, 8, 9, 10)
 
 
 def cells(image: Image.Image):
     for row in range(ROWS):
         for column in range(COLUMNS):
-            box = (column * CELL_WIDTH, row * CELL_HEIGHT, (column + 1) * CELL_WIDTH, (row + 1) * CELL_HEIGHT)
-            yield row, column, image.crop(box)
+            x, y = column * CELL_WIDTH, row * CELL_HEIGHT
+            yield row, column, image.crop((x, y, x + CELL_WIDTH, y + CELL_HEIGHT))
 
 
 def measure(cell: Image.Image) -> dict | None:
@@ -73,145 +59,129 @@ def measure(cell: Image.Image) -> dict | None:
     box = alpha.getbbox()
     if box is None:
         return None
-    # Head band: the top 90 px of the cell. The staff shares that band, so the
-    # value is only advisory - it is compared row to row, not frame to frame.
-    head = alpha.crop((0, 0, CELL_WIDTH, 90))
-    head_box = head.getbbox()
-    head_mass = 0
-    if head_box is not None:
-        histogram = head.histogram()
-        head_mass = head_mass + sum(histogram[25:])
-        head_mass = head_mass * 100 // max(1, head_box[2] * 90)
+    # This coverage is a reproducible diagnostic, never a head/body ratio.
+    histogram = alpha.crop((0, 0, CELL_WIDTH, 90)).histogram()
+    coverage = sum(value * count for value, count in enumerate(histogram)) / (255 * CELL_WIDTH * 90)
     return {
-        "width": box[2] - box[0],
-        "height": box[3] - box[1],
-        "top": box[1],
-        "bottom": box[3],
-        "head_mass": head_mass,
+        "left": box[0], "top": box[1], "right": box[2], "bottom": box[3],
+        "width": box[2] - box[0], "height": box[3] - box[1],
+        "topBandCoverage": round(coverage, 4),
     }
 
 
-def main() -> int:
-    args = [arg for arg in sys.argv[1:] if not arg.startswith("-")]
-    as_json = "--json" in sys.argv
-    sheet_path = Path(args[0]) if args else Path("spritesheet.webp")
-    if not sheet_path.exists():
-        sys.exit(f"no such file: {sheet_path}")
-
-    image = Image.open(sheet_path)
-    problems: list[str] = []
-    notes: list[str] = []
-
+def audit_image(image: Image.Image, file_size: int = 0) -> dict:
+    report = {
+        "size": list(image.size), "format": image.format,
+        "problems": [], "notes": [], "rows": [],
+    }
+    problems = report["problems"]
+    if image.format not in ("WEBP", "PNG"):
+        problems.append(f"format is {image.format!r}, expected WEBP or PNG")
+    if getattr(image, "is_animated", False):
+        problems.append("the atlas must be a still image, not an animated image")
+    if file_size > MAX_BYTES:
+        problems.append("file exceeds 20 MiB")
+    if "A" not in image.getbands() and "transparency" not in image.info:
+        problems.append("image has no alpha channel or palette transparency")
+    image = image.convert("RGBA")
+    alpha = image.getchannel("A")
+    if alpha.getextrema()[0] != 0:
+        problems.append("image has no fully transparent pixels")
+    if alpha.getbbox() is None:
+        problems.append("image is entirely transparent")
     if image.size != (SHEET_WIDTH, SHEET_HEIGHT):
-        problems.append(f"sheet is {image.size[0]}x{image.size[1]}, expected {SHEET_WIDTH}x{SHEET_HEIGHT}")
-    if image.mode != "RGBA":
-        image = image.convert("RGBA")
+        problems.append(f"sheet is {image.width}x{image.height}, expected {SHEET_WIDTH}x{SHEET_HEIGHT}")
+        # Pillow pads out-of-range crops; do not audit a padded, misleading grid.
+        return report
 
-    per_row: dict[int, list[dict]] = {}
+    per_row = {row: [] for row in EXPECTED}
     for row, column, cell in cells(image):
         data = measure(cell)
         if data is not None:
-            data["column"] = column
-            per_row.setdefault(row, []).append(data)
+            per_row[row].append({"column": column, **data})
 
-    reference = per_row.get(0, [])
-    if not reference:
-        problems.append("row 0 (idle) is empty")
-    baseline = statistics.median(item["bottom"] for item in reference) if reference else None
-    head_reference = statistics.median(item["head_mass"] for item in reference) if reference else None
+    if bool(per_row[9]) != bool(per_row[10]):
+        problems.append("look rows 9 and 10 must both be present or both be empty")
 
-    rows_report = []
-    for row, (name, expected, has_lying) in EXPECTED.items():
-        found = per_row.get(row, [])
-        painted = len(found)
-        entry = {"row": row, "name": name, "frames": painted, "expected": expected, "issues": []}
+    for row, (name, expected) in EXPECTED.items():
+        found = per_row[row]
+        entry = {"row": row, "name": name, "frames": len(found),
+                 "expected": list(expected), "cells": found, "issues": []}
+        report["rows"].append(entry)
 
-        if painted != expected:
-            message = f"row {row} ({name}) has {painted} painted cells, expected {expected}"
+        def fail(message):
+            message = f"row {row} ({name}): {message}"
             problems.append(message)
             entry["issues"].append(message)
 
-        if found:
-            heights = [item["height"] for item in found]
-            median = statistics.median(heights)
-            bottoms = [item["bottom"] for item in found]
-            entry["medianHeight"] = median
-            entry["medianWidth"] = statistics.median(item["width"] for item in found)
-            entry["baseline"] = statistics.median(bottoms)
-            entry["headMass"] = statistics.median(item["head_mass"] for item in found)
-
-            standing = [item for item in found if item["bottom"] >= median - CELL_HEIGHT * 0.1]
-            outliers = []
+        if len(found) not in expected:
+            fail(f"has {len(found)} painted cells, expected {' or '.join(map(str, expected))}")
+        if [item["column"] for item in found] != list(range(len(found))):
+            fail("painted cells must start at column 0 with empty cells only at the end")
+        if not found:
+            continue
+        median = statistics.median(item["height"] for item in found)
+        entry.update({
+            "medianHeight": median,
+            "medianWidth": statistics.median(item["width"] for item in found),
+            "boundsBottom": statistics.median(item["bottom"] for item in found),
+        })
+        # Jump anticipation/apex can legitimately change occupied height. Runs
+        # also need room for passing/flight poses; standing loops are tighter.
+        if row != 4:
+            tolerance = RUN_HEIGHT_TOLERANCE if row in RUN_ROWS else HEIGHT_TOLERANCE
             for item in found:
                 deviation = abs(item["height"] - median) / median
-                if deviation > HEIGHT_TOLERANCE:
-                    if has_lying and item["bottom"] < baseline - 20:
-                        notes.append(
-                            f"row {row} column {item['column']}: lying pose ({item['height']} px tall), "
-                            "the plugin's `columns` list skips it"
-                        )
-                        continue
-                    outliers.append(
-                        f"column {item['column']}: {item['height']} px ({deviation * 100:+.1f} % vs row median {median:.0f})"
-                    )
-            if outliers:
-                message = f"row {row} ({name}) has frames with a different height: " + "; ".join(outliers)
-                problems.append(message)
-                entry["issues"].append(message)
+                if deviation > tolerance:
+                    fail(f"column {item['column']} occupied height {item['height']} differs "
+                         f"{deviation:.1%} from row median {median:g} (limit {tolerance:.0%})")
+        if row in GROUNDED_ROWS:
+            for item in found:
+                if abs(item["bottom"] - BASELINE) > BASELINE_TOLERANCE:
+                    fail(f"column {item['column']} occupied bottom y={item['bottom']}, "
+                         f"expected {BASELINE} +/- {BASELINE_TOLERANCE}")
+        for item in found:
+            if item["left"] == 0 or item["right"] == CELL_WIDTH or item["top"] == 0 or item["bottom"] == CELL_HEIGHT:
+                fail(f"column {item['column']} touches a cell edge; check clipping or spill")
 
-            off_baseline = [
-                f"column {item['column']}: feet at y={item['bottom']}"
-                for item in standing
-                if baseline is not None and abs(item["bottom"] - baseline) > BASELINE_TOLERANCE
-            ]
-            if off_baseline:
-                message = (
-                    f"row {row} ({name}) does not stand on the row 0 baseline (y={baseline:.0f}): "
-                    + "; ".join(off_baseline)
-                )
-                problems.append(message)
-                entry["issues"].append(message)
+    report["notes"].append(
+        "Bounds include the staff and hair. Review body proportions, actual shoe contact, "
+        "pose continuity, handedness, gaze directions and loop seams visually."
+    )
+    if not per_row[9] and not per_row[10]:
+        report["notes"].append("Look poses are omitted; consumers must keep pointer look disabled.")
+    return report
 
-            if head_reference is not None and row not in (5,):
-                drift = (entry["headMass"] - head_reference) / head_reference
-                if abs(drift) > HEAD_MASS_TOLERANCE:
-                    # Advisory only: the staff shares the head band, so a raised
-                    # staff raises the number without any drawing problem.
-                    note = (
-                        f"row {row} ({name}) head band mass {entry['headMass']} differs {drift * 100:+.0f} % "
-                        f"from row 0 ({head_reference}); compare head/body ratio by eye"
-                    )
-                    notes.append(note)
-                    entry["issues"].append(f"advisory: {note}")
 
-        rows_report.append(entry)
-
-    if as_json:
-        print(json.dumps({"sheet": str(sheet_path), "problems": problems, "notes": notes, "rows": rows_report}, indent=2))
-        return 1 if problems else 0
-
-    print(f"sheet   {sheet_path}  {image.size[0]}x{image.size[1]}  {SHEET_WIDTH}x{SHEET_HEIGHT} expected")
-    print(f"baseline row 0 feet at y={baseline}")
-    print()
-    print(f"{'row':>3}  {'animation':<16} {'frames':>6}  {'height':>6}  {'width':>5}  {'feet':>4}  {'head':>4}")
-    for entry in rows_report:
-        print(
-            f"{entry['row']:>3}  {entry['name']:<16} {entry['frames']:>2}/{entry['expected']:<3} "
-            f"{entry.get('medianHeight', 0):>6.0f}  {entry.get('medianWidth', 0):>5.0f}  "
-            f"{entry.get('baseline', 0):>4.0f}  {entry.get('headMass', 0):>4}"
-        )
-
-    if notes:
-        print()
-        for note in notes:
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("sheet", nargs="?", default="spritesheet.webp", type=Path)
+    parser.add_argument("--json", action="store_true")
+    args = parser.parse_args()
+    try:
+        with Image.open(args.sheet) as image:
+            report = audit_image(image, args.sheet.stat().st_size)
+    except (OSError, ValueError) as error:
+        report = {"problems": [str(error)], "notes": [], "rows": []}
+    report["sheet"] = str(args.sheet)
+    if args.json:
+        print(json.dumps(report, indent=2))
+    else:
+        print(f"sheet   {args.sheet}  {report.get('size', 'unreadable')}")
+        print("All coordinates are zero based; bounds include staff and hair; bottom is exclusive.")
+        print(f"{'row':>3}  {'animation':<16} {'frames':>8} {'height':>7} {'width':>6} {'bottom':>7}")
+        for entry in report["rows"]:
+            expected = '|'.join(map(str, entry['expected']))
+            print(f"{entry['row']:>3}  {entry['name']:<16} {entry['frames']:>2}/{expected:<5} "
+                  f"{entry.get('medianHeight', 0):>7g} {entry.get('medianWidth', 0):>6g} "
+                  f"{entry.get('boundsBottom', 0):>7g}")
+        for note in report["notes"]:
             print(f"note   {note}")
-    print()
-    if problems:
-        for problem in problems:
+        for problem in report["problems"]:
             print(f"FAIL   {problem}")
-        return 1
-    print("OK     every row matches the atlas contract")
-    return 0
+        if not report["problems"]:
+            print("OK     structural checks passed; visual animation review is still required")
+    return 1 if report["problems"] else 0
 
 
 if __name__ == "__main__":

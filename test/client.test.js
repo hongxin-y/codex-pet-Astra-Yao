@@ -537,7 +537,7 @@ test('working/thinking flips do not restart the walk cycle while it is still new
   await feed(env, { active: true, sessionId: 's1', state: 'thinking', activity: '', pulse: null, title: null, project: null })
   env.pump(0)
   assert.equal(handle.snapshot.baseState, 'thinking')
-  assert.equal(sprite.style.backgroundPosition, '-288px -1248px', 'review is row 8, hand-on-chin column')
+  assert.equal(sprite.style.backgroundPosition, '0px -1248px', 'review starts at row 8, column 0')
 
   // A tool call escalates immediately: working outranks thinking.
   await feed(env, { active: true, sessionId: 's1', state: 'working', activity: 'shell', pulse: null, title: null, project: null })
@@ -558,7 +558,7 @@ test('working/thinking flips do not restart the walk cycle while it is still new
   env.runTimerMatching((timer) => timer.delay > 900)
   env.pump(0)
   assert.equal(handle.snapshot.baseState, 'thinking')
-  assert.equal(sprite.style.backgroundPosition, '-288px -1248px')
+  assert.equal(sprite.style.backgroundPosition, '0px -1248px')
 })
 
 test('the speed setting scales the frame interval', async () => {
@@ -579,10 +579,10 @@ test('the speed setting scales the frame interval', async () => {
 })
 
 // ---------------------------------------------------------------------------
-// Atlas quirks: this sheet has two rows that cannot be played as drawn
+// Repaired atlas: native rows play complete loops without frame workarounds
 // ---------------------------------------------------------------------------
 
-test('dragging right mirrors the clean left-run row instead of the crouched row', () => {
+test('dragging uses the repaired native right and left rows without a second mirror', () => {
   const { env } = applyWidget()
   const shadow = env.body.children[0]._shadow
   const pet = shadow.querySelector('.pet')
@@ -592,16 +592,16 @@ test('dragging right mirrors the clean left-run row instead of the crouched row'
   pet.dispatch('pointerdown', { button: 0, pointerId: 1, clientX: 200, clientY: 200, preventDefault() {} })
   env.fireWindow('pointermove', { clientX: 260, clientY: 200 })
   env.pump(0)
-  assert.equal(sprite.style.backgroundPosition, '0px -312px', 'row 2 is the left run, mirrored')
-  assert.equal(sprite.style.transform, 'scaleX(-1)')
+  assert.equal(sprite.style.backgroundPosition, '0px -156px', 'row 1 already contains the right-facing pixels')
+  assert.equal(sprite.style.transform, '')
 
   env.fireWindow('pointermove', { clientX: 140, clientY: 200 })
   env.pump(0)
   assert.equal(sprite.style.backgroundPosition, '0px -312px')
-  assert.equal(sprite.style.transform, '', 'running left drops the mirror again')
+  assert.equal(sprite.style.transform, '', 'row 2 contains the left-facing pixels')
 })
 
-test('the failed loop skips the lying frame so the pet never flops over', async () => {
+test('the failed loop plays all eight repaired standing frames and wraps', async () => {
   const { env } = applyWidget()
   const shadow = env.body.children[0]._shadow
   const sprite = shadow.querySelector('.sprite')
@@ -623,7 +623,7 @@ test('the failed loop skips the lying frame so the pet never flops over', async 
   assert.equal(handle.snapshot.baseState, 'error')
 
   const seen = []
-  for (let index = 0; index < 7; index += 1) {
+  for (let index = 0; index < 8; index += 1) {
     env.pump(index === 0 ? 0 : 140)
     seen.push(sprite.style.backgroundPosition)
   }
@@ -633,12 +633,15 @@ test('the failed loop skips the lying frame so the pet never flops over', async 
     '-288px -780px',
     '-432px -780px',
     '-576px -780px',
+    '-720px -780px',
     '-864px -780px',
     '-1008px -780px',
   ])
+  env.pump(140)
+  assert.equal(sprite.style.backgroundPosition, '0px -780px')
 })
 
-test('thinking holds the hand-on-chin pose instead of nodding through six frames', async () => {
+test('thinking plays six repaired poses at a calm cadence and wraps', async () => {
   const { env } = applyWidget()
   const sprite = env.body.children[0]._shadow.querySelector('.sprite')
   await feed(env, {
@@ -654,19 +657,23 @@ test('thinking holds the hand-on-chin pose instead of nodding through six frames
     pulse: null,
   })
   env.pump(0)
-  assert.equal(sprite.style.backgroundPosition, '-288px -1248px', 'column 2 is the pondering pose')
+  assert.equal(sprite.style.backgroundPosition, '0px -1248px', 'the pondering cycle starts at column 0')
 
-  env.pump(619)
-  assert.equal(sprite.style.backgroundPosition, '-288px -1248px', 'the pose is held, not flicked through')
+  env.pump(359)
+  assert.equal(sprite.style.backgroundPosition, '0px -1248px', 'the pose is held, not flicked through')
 
   env.pump(2)
-  assert.equal(sprite.style.backgroundPosition, '-432px -1248px', 'column 3 is the slow blink')
+  assert.equal(sprite.style.backgroundPosition, '-144px -1248px', 'the next drawing is a blink')
 
-  env.pump(620)
-  assert.equal(sprite.style.backgroundPosition, '-288px -1248px', 'and back to pondering')
+  const seen = []
+  for (let index = 0; index < 5; index++) {
+    env.pump(360)
+    seen.push(sprite.style.backgroundPosition)
+  }
+  assert.deepEqual(seen, ['-288px -1248px', '-432px -1248px', '-576px -1248px', '-720px -1248px', '0px -1248px'])
 })
 
-test('pointer look is opt-in: rows 9-10 are drawn at a different scale', async () => {
+test('pointer look remains opt-in and limited to a nearby cursor', async () => {
   const { env } = applyWidget()
   const sprite = env.body.children[0]._shadow.querySelector('.sprite')
   const session = { active: true, sessionId: 's1', state: 'idle', activity: '', pulse: null, title: null, project: null }

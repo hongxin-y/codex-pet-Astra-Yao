@@ -41,35 +41,23 @@ test('atlas dimensions describe a Codex v2 spritesheet', () => {
 
 test('animation table uses the Codex row and frame counts', () => {
   assert.deepEqual(ANIMATIONS.idle, { row: 0, frames: 6, interval: 160 })
-  // Row 1 of this atlas mixes crouched frames into the run cycle: mirror row 2.
-  assert.deepEqual(ANIMATIONS.runningRight, { row: 2, frames: 8, interval: 120, flip: true })
+  // The mirrored pixels are now in the asset's native right-run row.
+  assert.deepEqual(ANIMATIONS.runningRight, { row: 1, frames: 8, interval: 120 })
   assert.deepEqual(ANIMATIONS.runningLeft, { row: 2, frames: 8, interval: 120 })
   assert.deepEqual(ANIMATIONS.waving, { row: 3, frames: 4, interval: 140 })
   assert.deepEqual(ANIMATIONS.jumping, { row: 4, frames: 5, interval: 140 })
-  // Frame 5 is a lying pose; the loop skips it so the pet never flops over.
-  assert.deepEqual(ANIMATIONS.failed, {
-    row: 5,
-    frames: 7,
-    interval: 140,
-    columns: [0, 1, 2, 3, 4, 6, 7],
-  })
+  assert.deepEqual(ANIMATIONS.failed, { row: 5, frames: 8, interval: 140 })
   assert.deepEqual(ANIMATIONS.waiting, { row: 6, frames: 6, interval: 150 })
   assert.deepEqual(ANIMATIONS.running, { row: 7, frames: 6, interval: 120 })
-  // "Thinking" holds the hand-on-chin pose instead of nodding through all six frames.
-  assert.deepEqual(ANIMATIONS.review, {
-    row: 8,
-    frames: 3,
-    interval: 620,
-    columns: [2, 3, 2],
-  })
+  assert.deepEqual(ANIMATIONS.review, { row: 8, frames: 6, interval: 360 })
   assert.equal(animationFor('missing'), ANIMATIONS.idle)
 })
 
-test('columnOf follows skipped frames and clamps', () => {
+test('columnOf uses every repaired frame and clamps', () => {
   assert.equal(columnOf('idle', 3), 3)
   assert.equal(columnOf('failed', 4), 4)
-  assert.equal(columnOf('failed', 5), 6)
-  assert.equal(columnOf('failed', 6), 7)
+  assert.equal(columnOf('failed', 5), 5)
+  assert.equal(columnOf('failed', 6), 6)
   assert.equal(columnOf('failed', 99), 7)
   assert.equal(columnOf('failed', -1), 0)
   assert.equal(columnOf('failed', 1.7), 1)

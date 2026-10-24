@@ -33,40 +33,21 @@ export const LOOK_CELLS = 16
 export const LOOK_STEP_DEGREES = 360 / LOOK_CELLS // 22.5
 
 /**
- * Animation table, matching the Codex desktop pet defaults, except for two
- * quirks of this particular atlas:
- *
- *   runningRight  row 1 mixes three kneeling frames (174-189 px tall against
- *                 198 for the rest) into the cycle, so the pet plays row 2 -
- *                 which is clean - mirrored instead.
- *   failed        frame 5 is a lying-down pose; left in the loop the pet flops
- *                 to the floor and stands back up every second.
- *   review        the six-frame cycle ends in a head-down, eyes-closed nod, so
- *                 looping it at 150 ms makes the pet nod once a second. Only
- *                 the hand-on-chin pose (column 2) and its blink (column 3) are
- *                 used, at a much slower cadence, so "thinking" reads as
- *                 pondering instead of headbanging.
+ * The repaired atlas uses the native rows without skipped or duplicated
+ * playback columns. Row 1 contains the materialized mirror of row 2; row 7
+ * samples six distinct phases of that same run. Failed is a standing sigh
+ * throughout; review is a steady hand-on-chin loop at a calmer cadence.
  */
 export const ANIMATIONS = Object.freeze({
   idle: Object.freeze({ row: 0, frames: 6, interval: 160 }),
-  runningRight: Object.freeze({ row: 2, frames: 8, interval: 120, flip: true }),
+  runningRight: Object.freeze({ row: 1, frames: 8, interval: 120 }),
   runningLeft: Object.freeze({ row: 2, frames: 8, interval: 120 }),
   waving: Object.freeze({ row: 3, frames: 4, interval: 140 }),
   jumping: Object.freeze({ row: 4, frames: 5, interval: 140 }),
-  failed: Object.freeze({
-    row: 5,
-    frames: 7,
-    interval: 140,
-    columns: Object.freeze([0, 1, 2, 3, 4, 6, 7]),
-  }),
+  failed: Object.freeze({ row: 5, frames: 8, interval: 140 }),
   waiting: Object.freeze({ row: 6, frames: 6, interval: 150 }),
   running: Object.freeze({ row: 7, frames: 6, interval: 120 }),
-  review: Object.freeze({
-    row: 8,
-    frames: 3,
-    interval: 620,
-    columns: Object.freeze([2, 3, 2]),
-  }),
+  review: Object.freeze({ row: 8, frames: 6, interval: 360 }),
 })
 
 /**

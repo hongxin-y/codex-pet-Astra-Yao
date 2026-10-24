@@ -23,9 +23,11 @@
     "USAGE.md"
   ],
   "scripts": {
+    "build:atlas": "node scripts/pack-atlas.mjs",
     "build": "node scripts/build-client.mjs",
     "verify": "node scripts/verify.mjs",
-    "test": "node --test test/",
+    "test": "node --test \"test/*.test.js\"",
+    "test:atlas": "python -B test/audit_atlas_test.py",
     "prepare": "node scripts/build-client.mjs"
   },
   "keywords": [
@@ -63,5 +65,8 @@
       "inject": [],
       "platform": "web"
     }
+  },
+  "devDependencies": {
+    "sharp": "0.35.5"
   }
 }
