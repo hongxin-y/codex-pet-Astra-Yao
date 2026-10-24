@@ -66,21 +66,22 @@ const DEFAULT_CONFIG = Object.freeze({
 const STATE_LABELS = Object.freeze({
   idle: '后台待机',
   thinking: '构思中',
-  working: '演出中',
+  working: '执行中',
   waiting: '候场中',
   error: '破音了',
 })
 
-// Astra Yao is a stage singer: while she is idle the bubble shows a line of
-// backstage chatter instead of a technical status, and rotates it slowly so the
-// pet does not look frozen.
+// Astra Yao is a stage singer: while she is idle the bubble quotes her instead of
+// printing a technical status, and rotates the line slowly so the pet never looks
+// frozen. Lines come from her official character intro and her in-game voice-over
+// set (idle / Quality Time), translated where the recording is English only.
 const IDLE_LINES = Object.freeze([
-  '今晚的主角，是我。',
-  '灯光准备好了吗？',
-  '麦克风试音，一二三～',
-  '掌声在哪里？',
-  '演出前，先润润嗓子。',
-  '返场？现在就想听？',
+  '今夜，星光灿烂。',
+  '这个世界上最闪亮的东西，当然是爱！',
+  '一段安宁的间奏，正好休息～',
+  '短暂的停顿，会让旋律更甜。',
+  '要不要听首歌？咳——',
+  '让旋律带着你走～',
 ])
 
 const WAITING_LABELS = Object.freeze({

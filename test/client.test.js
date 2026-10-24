@@ -455,7 +455,7 @@ test('the status bubble mirrors the session and honours showBubble', async () =>
   })
 
   assert.equal(bubble.hidden, false)
-  assert.equal(bubbleState.textContent, '演出中')
+  assert.equal(bubbleState.textContent, '执行中')
   assert.equal(bubbleDetail.hidden, false)
   assert.equal(bubbleDetail.textContent, 'shell')
   assert.equal(bubbleSub.textContent, 'pet-astra-yao · 修 bug')
@@ -517,15 +517,15 @@ test('idle cycles backstage lines instead of a technical status', async () => {
 
   await feed(env, idle)
   assert.equal(bubbleState.hidden, true, 'the idle line speaks for itself')
-  assert.equal(bubbleDetail.textContent, '今晚的主角，是我。')
+  assert.equal(bubbleDetail.textContent, '今夜，星光灿烂。')
 
   env.advanceClock(9000)
   await feed(env, idle)
-  assert.equal(bubbleDetail.textContent, '灯光准备好了吗？')
+  assert.equal(bubbleDetail.textContent, '这个世界上最闪亮的东西，当然是爱！')
 
   env.advanceClock(9000)
   await feed(env, idle)
-  assert.equal(bubbleDetail.textContent, '麦克风试音，一二三～')
+  assert.equal(bubbleDetail.textContent, '一段安宁的间奏，正好休息～')
 })
 
 test('working/thinking flips do not restart the walk cycle while it is still new', async () => {
@@ -552,8 +552,10 @@ test('working/thinking flips do not restart the walk cycle while it is still new
   assert.equal(sprite.style.backgroundPosition, '-144px -1092px', 'the walk cycle keeps advancing instead of restarting')
 
   // Once the hold window has passed the pending timer drops back to review.
+  // The delay is BASE_HOLD_MS minus the time already spent, so match by range
+  // (the poll timer sits at 900 ms and is the only other one in flight).
   env.advanceClock(1600)
-  env.runTimerMatching((timer) => timer.delay === 1500)
+  env.runTimerMatching((timer) => timer.delay > 900)
   env.pump(0)
   assert.equal(handle.snapshot.baseState, 'thinking')
   assert.equal(sprite.style.backgroundPosition, '-288px -1248px')
