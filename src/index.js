@@ -378,12 +378,35 @@ export function mount(ctx, config = {}) {
   // instead of touching the property directly: DSH 0.2.1-rc.3+ throws
   // `cannot get property "credentials" without inject` on direct access.
   let credentialsService = null
+  // Account sign-in (the default for the desktop app) has no API key at all, so
+  // the account service is the primary source; the API key is the fallback for
+  // installs that were set up with one.
+  let accountService = null
   if (typeof ctx.inject === 'function') {
     ctx.inject(['credentials'], (credentialCtx) => {
       credentialsService = credentialCtx.credentials ?? null
     })
+    ctx.inject(['deepseekAccount'], (accountCtx) => {
+      accountService = accountCtx.deepseekAccount ?? null
+    })
   }
   const balance = createBalanceService({
+    readAccount: async () => {
+      const service = accountService
+      if (!service || typeof service.getBalance !== 'function') return { code: 'NO_ACCOUNT' }
+      const outcome = await service.getBalance({
+        version: VERSION,
+        locale: 'zh-CN',
+        timezoneOffsetSeconds: -new Date().getTimezoneOffset() * 60,
+      })
+      if (!outcome) return { code: 'NO_ACCOUNT' } // signed out
+      if (outcome.status === 'failed') return { code: 'ACCOUNT_ERROR', transient: true, error: '账户余额读取失败' }
+      const wallets = [...(Array.isArray(outcome.value) ? outcome.value : []), ...(Array.isArray(outcome.bonusWallets) ? outcome.bonusWallets : [])]
+      const wallet = wallets.find((item) => String(item?.currency).toUpperCase() === 'CNY') ?? wallets[0]
+      const total = Number(wallet?.balance)
+      if (!wallet || !Number.isFinite(total)) return { code: 'NO_ACCOUNT' }
+      return { total, currency: String(wallet.currency || 'CNY') }
+    },
     resolveCredential: async (credentialName) => {
       // A key pasted into the environment is the simplest way to switch the
       // readout on without going through DSH's credential store; the store wins

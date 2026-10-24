@@ -33,7 +33,11 @@ function todayKey(now) {
 
 /**
  * @param {object} options
- * @param {(name: string) => Promise<{value: string}|null>} options.resolveCredential
+ * @param {(name: string) => Promise<{value: string}|null>} [options.resolveCredential]
+ * @param {() => Promise<{total: number, currency: string}|{code: string, error?: string}|null>} [options.readAccount]
+ *   Reads the signed-in account wallet through DSH's own account service, so an
+ *   account login never needs an API key. `{ code: 'NO_ACCOUNT' }` means "fall
+ *   back to the API key"; any other code is reported as-is.
  * @param {string} [options.dshHome]
  * @param {typeof fetch} [options.fetchImpl]
  * @param {() => number} [options.now]
@@ -42,6 +46,7 @@ function todayKey(now) {
  */
 export function createBalanceService(options = {}) {
   const resolveCredential = options.resolveCredential
+  const readAccount = options.readAccount
   const fetchImpl = options.fetchImpl ?? globalThis.fetch
   const now = options.now ?? (() => Date.now())
   const ttlMs = Number.isFinite(options.ttlMs) ? Number(options.ttlMs) : DEFAULT_TTL_MS
@@ -101,7 +106,33 @@ export function createBalanceService(options = {}) {
     return response.json()
   }
 
-  async function fetchBalance() {
+  function settle(total, currency, source) {
+    const todayUsage = recordUsage(total)
+    return {
+      ok: true,
+      totalBalance: total,
+      currency: String(currency || 'CNY'),
+      todayUsage,
+      source,
+      updatedAt: new Date(now()).toISOString(),
+    }
+  }
+
+  /** Reads the signed-in account wallet first: that works without any API key. */
+  async function readFromAccount() {
+    if (typeof readAccount !== 'function') return { code: 'NO_ACCOUNT' }
+    let outcome = null
+    try {
+      outcome = await readAccount()
+    } catch (error) {
+      return { code: 'ACCOUNT_ERROR', transient: true, error: `账户余额读取失败: ${clampText(error?.message ?? error, 120)}` }
+    }
+    if (!outcome) return { code: 'NO_ACCOUNT' }
+    if (Number.isFinite(outcome.total)) return settle(outcome.total, outcome.currency, 'account')
+    return outcome
+  }
+
+  async function readFromApiKey() {
     if (typeof resolveCredential !== 'function') {
       return { ok: false, code: 'NO_SERVICE', error: '凭据服务不可用' }
     }
@@ -123,14 +154,7 @@ export function createBalanceService(options = {}) {
         if (!info || !Number.isFinite(total)) {
           return { ok: false, code: 'SHAPE', error: '余额接口返回结构异常' }
         }
-        const todayUsage = recordUsage(total)
-        return {
-          ok: true,
-          totalBalance: total,
-          currency: String(info.currency || 'CNY'),
-          todayUsage,
-          updatedAt: new Date(now()).toISOString(),
-        }
+        return settle(total, info.currency, 'key')
       } catch (error) {
         lastError = error
         if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 400))
@@ -139,6 +163,15 @@ export function createBalanceService(options = {}) {
     const message = clampText(lastError?.message ?? lastError, 160)
     const transient = !/^HTTP 4\d\d/u.test(message)
     return { ok: false, code: 'HTTP', transient, error: `余额请求失败: ${message}` }
+  }
+
+  async function fetchBalance() {
+    const account = await readFromAccount()
+    if (account.ok) return account
+    // "no account wallet" only means "try the API key instead"; a real account
+    // failure (expired grant, network) is worth reporting on its own.
+    if (account.code !== 'NO_ACCOUNT') return { ...account, ok: false }
+    return readFromApiKey()
   }
 
   /**

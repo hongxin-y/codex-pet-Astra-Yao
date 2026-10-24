@@ -202,3 +202,47 @@ test('in-flight requests are shared', async () => {
   assert.equal(a.totalBalance, 3)
   assert.equal(b.totalBalance, 3)
 })
+
+test('a signed-in account supplies the balance without any API key', async () => {
+  // The desktop app signs in with an account, so there is no DEEPSEEK_API_KEY to
+  // read; the account service already holds the wallet.
+  const home = freshHome()
+  const fetchImpl = fetchStub([])
+  const service = createBalanceService({
+    readAccount: async () => ({ total: 88.5, currency: 'CNY' }),
+    resolveCredential: async () => null,
+    dshHome: home,
+    fetchImpl,
+  })
+  const payload = await service.getBalance()
+  assert.equal(payload.ok, true)
+  assert.equal(payload.totalBalance, 88.5)
+  assert.equal(payload.currency, 'CNY')
+  assert.equal(payload.source, 'account')
+  assert.equal(fetchImpl.calls.length, 0, 'the account read must not hit the public API')
+})
+
+test('a missing account wallet falls back to the key, account errors are reported', async () => {
+  const viaKey = createBalanceService({
+    readAccount: async () => ({ code: 'NO_ACCOUNT' }),
+    resolveCredential: credentialStub('sk'),
+    dshHome: freshHome(),
+    fetchImpl: fetchStub([balancePayload('9.00')]),
+  })
+  const payload = await viaKey.getBalance()
+  assert.equal(payload.ok, true)
+  assert.equal(payload.source, 'key')
+
+  const broken = createBalanceService({
+    readAccount: async () => {
+      throw new Error('grant expired')
+    },
+    resolveCredential: credentialStub('sk'),
+    dshHome: freshHome(),
+    fetchImpl: fetchStub([balancePayload('1.00')]),
+  })
+  const failed = await broken.getBalance()
+  assert.equal(failed.ok, false)
+  assert.equal(failed.code, 'ACCOUNT_ERROR')
+  assert.match(failed.error, /grant expired/u)
+})

@@ -152,11 +152,14 @@ pnpm 会拉仓库、跑 `prepare` 重新生成 `lib/client.js`。这样装的是
 
 「显示余额」打开后，第三行换成 DeepSeek 账户余额和今日消耗：
 
-- 服务端通过 DSH 的 `credentials` 服务取 `DEEPSEEK_API_KEY`，请求 `https://api.deepseek.com/user/balance`，
-  60 秒缓存，浏览器端每 60 秒最多拉一次（`GET /balance?refresh=1` 可以强制刷新）。
+- 余额有两个来源，按顺序尝试：先用 DSH 自己的 `deepseekAccount` 账户服务读登录账户的钱包
+  （**账户登录不需要 API Key**）；读不到账户钱包时再退到 `credentials` 里的 `DEEPSEEK_API_KEY`，
+  最后才退到环境变量 `DEEPSEEK_API_KEY`。都没配置时显示「未配置 Key」，不会假装有数字。
+  接口是 `https://api.deepseek.com/user/balance`（Key 模式），60 秒缓存，浏览器端每 60 秒最多拉一次
+  （`GET /balance?refresh=1` 可以强制刷新）。
 - 今日消耗按「余额下降」累计，账本存在 `%USERPROFILE%\.dsh\.dsh-pet-astra-yao-usage.json`，跨天自动归零；
   充值导致余额上升时不会记成负消耗。
-- 没配置 Key、或者当前 DSH 没有暴露 `credentials` 服务时，气泡显示「余额不可用：未配置 API Key」，
+- 没配置 Key、或者当前 DSH 没有暴露 `credentials` / `deepseekAccount` 服务时，气泡显示「余额不可用：未配置 API Key」，
   桌宠其它功能不受影响。DSH 的凭据服务里没有这个 Key 时，服务端会退一步读环境变量
   `DEEPSEEK_API_KEY`，所以在启动 DSH 的环境里导出它同样能显示余额。
 - 余额只从你的机器直连 DeepSeek，不经过 DSH 的服务器；接口本身也只接受本机回环请求。

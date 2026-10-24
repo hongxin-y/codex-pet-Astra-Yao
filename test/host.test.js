@@ -430,7 +430,7 @@ test('mount never reads a service property outside its inject gate', () => {
 
   const mounted = mount(ctx, { showBubbleUsage: true })
   assert.ok(mounted.balance, 'the balance service is still built without credentials')
-  assert.deepEqual(gated.sort(), ['credentials', 'settings', 'webServer'])
+  assert.deepEqual(gated.sort(), ['credentials', 'deepseekAccount', 'settings', 'webServer'])
   assert.equal(routes.length, 6, 'every endpoint is mounted despite the strict context')
 })
 
