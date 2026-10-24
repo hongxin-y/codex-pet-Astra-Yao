@@ -407,11 +407,27 @@ function animationOf(name) {
   return ANIMATIONS[name] ?? ANIMATIONS.idle
 }
 
+// The look rows are 16 discrete cells, so a slow arc would otherwise flip
+// between two neighbours every few degrees. A cell is only left once the
+// pointer is past its 22.5deg wedge plus this margin.
+const LOOK_HYSTERESIS_DEGREES = 6
+let lookIndex = -1
+
+function cellAtIndex(index) {
+  const safe = ((Math.round(index) % LOOK_CELLS) + LOOK_CELLS) % LOOK_CELLS
+  return { row: LOOK_ROW + Math.floor(safe / COLUMNS), column: safe % COLUMNS, index: safe }
+}
+
 function cellForVector(dx, dy) {
   const step = 360 / LOOK_CELLS
   const degrees = (((Math.atan2(dx, -dy) * 180) / Math.PI) % 360 + 360) % 360
-  const index = Math.round(degrees / step) % LOOK_CELLS
-  return { row: LOOK_ROW + Math.floor(index / COLUMNS), column: index % COLUMNS }
+  const target = Math.round(degrees / step) % LOOK_CELLS
+  if (lookIndex >= 0 && target !== lookIndex) {
+    const offset = ((degrees - lookIndex * step + 540) % 360) - 180
+    if (Math.abs(offset) <= step / 2 + LOOK_HYSTERESIS_DEGREES) return cellAtIndex(lookIndex)
+  }
+  lookIndex = target
+  return cellAtIndex(target)
 }
 
 // ---------------------------------------------------------------------------
@@ -570,7 +586,10 @@ function frameLoop(now) {
   if (lookCell && currentAnimation.name === 'idle') {
     // Hold the glance for a moment, then relax back into the idle loop so a
     // parked cursor does not freeze the pet into a static pose.
-    if (now - lastLookMoveAt > LOOK_HOLD_MS) lookCell = null
+    if (now - lastLookMoveAt > LOOK_HOLD_MS) {
+      lookCell = null
+      lookIndex = -1
+    }
     else {
       paint(lookCell.row, lookCell.column)
       return
@@ -834,7 +853,10 @@ function applyConfig(next, options = {}) {
   }
 
   if (menuOpen) syncMenu()
-  if (cfg.lookAtPointer === false) lookCell = null
+  if (cfg.lookAtPointer === false) {
+    lookCell = null
+    lookIndex = -1
+  }
   if (!currentAnimation) playBase()
   else if (speedFactor() !== previousSpeed) play(currentAnimation.name, { once: currentAnimation.once })
   renderBubble()
@@ -1054,6 +1076,7 @@ function poke() {
 function updateLook(event) {
   if (!petEl || cfg.hidden || cfg.paused || cfg.lookAtPointer === false) {
     lookCell = null
+    lookIndex = -1
     return
   }
   const now = performance.now()
@@ -1066,6 +1089,7 @@ function updateLook(event) {
   const distance = Math.hypot(dx, dy)
   if (distance < LOOK_DEADZONE || distance > LOOK_RANGE) {
     lookCell = null
+    lookIndex = -1
     return
   }
   lookCell = cellForVector(dx, dy)

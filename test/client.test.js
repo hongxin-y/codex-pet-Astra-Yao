@@ -673,6 +673,37 @@ test('thinking plays six repaired poses at a calm cadence and wraps', async () =
   assert.deepEqual(seen, ['-288px -1248px', '-432px -1248px', '-576px -1248px', '-720px -1248px', '0px -1248px'])
 })
 
+test('a slow arc holds each look cell instead of chattering at its edge', async () => {
+  const { env } = applyWidget()
+  const sprite = env.body.children[0]._shadow.querySelector('.sprite')
+  const session = { active: true, sessionId: 's1', state: 'idle', activity: '', pulse: null, title: null, project: null }
+  await feed(env, session)
+  env.pump(0)
+
+  // 16 look cells are 22.5deg apart; the client adds a 6deg margin so a hand
+  // tracing a circle does not flip between two neighbours at every boundary.
+  const aim = (degrees) => {
+    const radians = (degrees * Math.PI) / 180
+    env.advanceClock(120)
+    env.fireWindow('pointermove', {
+      clientX: 72 + Math.sin(radians) * 100,
+      clientY: 78 - Math.cos(radians) * 100,
+    })
+    env.pump(0)
+  }
+
+  aim(0)
+  assert.equal(sprite.style.backgroundPosition, '0px -1404px', 'straight up is cell 0')
+  aim(14)
+  assert.equal(sprite.style.backgroundPosition, '0px -1404px', '14deg stays inside cell 0')
+  aim(20)
+  assert.equal(sprite.style.backgroundPosition, '-144px -1404px', '20deg commits cell 1')
+  aim(12)
+  assert.equal(sprite.style.backgroundPosition, '-144px -1404px', 'walking back does not bounce immediately')
+  aim(4)
+  assert.equal(sprite.style.backgroundPosition, '0px -1404px', 'past the margin it returns to cell 0')
+})
+
 test('pointer look follows a nearby cursor and can be switched off', async () => {
   const { env } = applyWidget()
   const sprite = env.body.children[0]._shadow.querySelector('.sprite')

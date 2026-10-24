@@ -69,6 +69,42 @@ def measure(cell: Image.Image) -> dict | None:
     }
 
 
+def face_pixels(cell: Image.Image) -> int:
+    """Count skin-toned pixels: a cheap proxy for how much face is visible.
+
+    A real 16-step turntable hides the face at the back and cuts it roughly in
+    half at the sides, so the count must swing widely across rows 9-10.
+    """
+    data = cell.tobytes()
+    count = 0
+    for index in range(0, len(data), 4):
+        r, g, b, a = data[index], data[index + 1], data[index + 2], data[index + 3]
+        if a > 200 and r > 190 and g > 130 and b > 110 and r > g + 25 and g > b:
+            count += 1
+    return count
+
+
+def look_turntable(image: Image.Image) -> dict | None:
+    faces, widths = [], []
+    for index in range(16):
+        row, column = 9 + index // 8, index % 8
+        x, y = column * CELL_WIDTH, row * CELL_HEIGHT
+        cell = image.crop((x, y, x + CELL_WIDTH, y + CELL_HEIGHT))
+        box = cell.getchannel("A").getbbox()
+        if box is None:
+            return None
+        faces.append(face_pixels(cell))
+        widths.append(box[2] - box[0])
+    top = max(faces) or 1
+    spread = (max(faces) - min(faces)) / top
+    return {
+        "faces": faces,
+        "widths": widths,
+        "faceSpread": round(spread, 3),
+        "widthSpread": round((max(widths) - min(widths)) / (max(widths) or 1), 3),
+    }
+
+
 def audit_image(image: Image.Image, file_size: int = 0) -> dict:
     report = {
         "size": list(image.size), "format": image.format,
@@ -150,6 +186,17 @@ def audit_image(image: Image.Image, file_size: int = 0) -> dict:
     )
     if not per_row[9] and not per_row[10]:
         report["notes"].append("Look poses are omitted; consumers must keep pointer look disabled.")
+    else:
+        turntable = look_turntable(image)
+        if turntable is not None:
+            report["look"] = turntable
+            if turntable["faceSpread"] < 0.45:
+                report["notes"].append(
+                    "Look rows 9-10 barely change the visible face "
+                    f"(spread {turntable['faceSpread']:.0%}): they read as 16 near-identical front "
+                    "views, so pointer look looks like a twitch instead of a turn. Redraw them as a "
+                    "real turntable (see docs/atlas-brief.md)."
+                )
     return report
 
 
@@ -175,6 +222,10 @@ def main() -> int:
             print(f"{entry['row']:>3}  {entry['name']:<16} {entry['frames']:>2}/{expected:<5} "
                   f"{entry.get('medianHeight', 0):>7g} {entry.get('medianWidth', 0):>6g} "
                   f"{entry.get('boundsBottom', 0):>7g}")
+        look = report.get("look")
+        if look:
+            print(f"{'look':>3}  {'directions':<16} {len(look['faces']):>2}/16    "
+                  f"face spread {look['faceSpread']:>5.0%}  width spread {look['widthSpread']:>5.0%}")
         for note in report["notes"]:
             print(f"note   {note}")
         for problem in report["problems"]:
