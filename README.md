@@ -102,6 +102,10 @@ pnpm 会拉仓库、跑 `prepare` 重新生成 `lib/client.js`。这样装的是
 之后刷新页面即可。图集文件本身按 `mtime` + `ETag` 校验，替换图片不需要清浏览器缓存；
 只有 host 代码变更才需要重启。
 
+> **DSH 0.2.1-rc.3 起** cordis 会拒绝读取未经 `inject` 声明的服务（`cannot get property "x" without inject`），
+> 直接读 `ctx.credentials` 会让 host 半边在启动时静默失败——表现是桌宠只剩气泡、写着「未连接」。
+> 本插件（0.1.1+）改成全部通过 `ctx.inject([...], scoped => …)` 取服务，缺服务时功能降级而不是报错。
+
 ## 交互
 
 | 操作 | 效果 |

@@ -390,6 +390,48 @@ test('apply wires session tracking, config storage and routes together', async (
   assert.equal(body.session.active, false)
 })
 
+test('mount never reads a service property outside its inject gate', () => {
+  // DSH 0.2.1-rc.3+ throws "cannot get property <name> without inject" when a
+  // plugin touches a service it did not gate on, which silently kills the host
+  // half (no routes, an offline client). Services are only reachable through
+  // the scoped context an inject callback receives.
+  const { routes, httpCtx } = fakeHttpContext()
+  const provided = {
+    settings: { register: () => null },
+    credentials: { resolve: async () => null },
+    webServer: httpCtx.webServer,
+  }
+  const gated = []
+  const ctx = {
+    logger: { warn() {} },
+    on: () => () => {},
+    effect: (factory) => factory(),
+    inject(services, callback) {
+      gated.push(...services)
+      const missing = services.filter((name) => !(name in provided))
+      if (missing.length > 0) return
+      const scoped = {
+        effect: (factory) => factory(),
+        get: (name) => provided[name],
+      }
+      for (const name of services) scoped[name] = provided[name]
+      callback(scoped)
+    },
+  }
+  for (const name of ['settings', 'credentials', 'webServer']) {
+    Object.defineProperty(ctx, name, {
+      get() {
+        throw new Error(`cannot get property "${name}" without inject`)
+      },
+    })
+  }
+
+  const mounted = mount(ctx, { showBubbleUsage: true })
+  assert.ok(mounted.balance, 'the balance service is still built without credentials')
+  assert.deepEqual(gated.sort(), ['credentials', 'settings', 'webServer'])
+  assert.equal(routes.length, 6, 'every endpoint is mounted despite the strict context')
+})
+
 test('mount returns the tracker, store and handlers it built', async () => {
   const { httpCtx } = fakeHttpContext()
   const ctx = { logger: { warn() {} }, inject: (_s, cb) => cb(httpCtx), on: () => () => {}, effect: (factory) => factory() }

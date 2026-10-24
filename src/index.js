@@ -244,6 +244,17 @@ export function guardHandler(handler, logger) {
 }
 
 /**
+ * Read `ctx.logger` defensively: cordis can refuse undeclared service access.
+ */
+export function loggerOf(ctx) {
+  try {
+    return typeof ctx?.logger?.warn === 'function' ? ctx.logger : null
+  } catch {
+    return null
+  }
+}
+
+/**
  * Register the pet routes on the DSH web server.
  * @param {object} ctx cordis context (or an object exposing `inject`)
  * @param {object} deps
@@ -255,6 +266,7 @@ export function registerRoutes(ctx, deps) {
     if (!server || typeof server.register !== 'function') return
     const effect = typeof httpCtx.effect === 'function' ? httpCtx.effect.bind(httpCtx) : ctx.effect?.bind(ctx)
     if (typeof effect !== 'function') return
+    const logger = loggerOf(ctx)
     const handlers = deps.handlers
     const routes = [
       ['state', ENDPOINTS.state, handlers.serveState],
@@ -266,7 +278,7 @@ export function registerRoutes(ctx, deps) {
     ]
     for (const [label, path, handler] of routes) {
       effect(
-        () => server.register({ kind: 'exact', path, handler: guardHandler(handler, ctx.logger) }),
+        () => server.register({ kind: 'exact', path, handler: guardHandler(handler, logger) }),
         `dsh-pet-astra-yao: ${label}`,
       )
     }
@@ -303,14 +315,16 @@ export function mount(ctx, config = {}) {
         if (typeof off === 'function') ctx.effect?.(() => off, 'dsh-pet-astra-yao: config watch')
       }
     } catch (error) {
-      ctx.logger?.warn?.(`dsh-pet-astra-yao: settings registration failed: ${String(error)}`)
+      loggerOf(ctx)?.warn?.(`dsh-pet-astra-yao: settings registration failed: ${String(error)}`)
     }
   }
 
-  // Settings may already be live, or may arrive later.
-  registerForms(ctx)
+  // Settings may already be live, or may arrive later. Reading `ctx.settings`
+  // without an `inject` gate throws on DSH 0.2.1-rc.3+, so wait for the gate.
   if (typeof ctx.inject === 'function') {
     ctx.inject(['settings'], (settingsCtx) => registerForms(settingsCtx))
+  } else {
+    registerForms(ctx)
   }
 
   const store = {
@@ -322,7 +336,7 @@ export function mount(ctx, config = {}) {
       try {
         formUpdate?.(patch)
       } catch (error) {
-        ctx.logger?.warn?.(`dsh-pet-astra-yao: persisting config failed: ${String(error)}`)
+        loggerOf(ctx)?.warn?.(`dsh-pet-astra-yao: persisting config failed: ${String(error)}`)
       }
       return cfg
     },
@@ -350,20 +364,26 @@ export function mount(ctx, config = {}) {
     }, 'dsh-pet-astra-yao: session events')
   }
 
-  const credentialsService =
-    (typeof ctx.get === 'function' ? ctx.get('credentials') : undefined) ?? ctx.credentials
+  // Balance is optional, so `credentials` is picked up through an inject gate
+  // instead of touching the property directly: DSH 0.2.1-rc.3+ throws
+  // `cannot get property "credentials" without inject` on direct access.
+  let credentialsService = null
+  if (typeof ctx.inject === 'function') {
+    ctx.inject(['credentials'], (credentialCtx) => {
+      credentialsService = credentialCtx.credentials ?? null
+    })
+  }
   const balance = createBalanceService({
-    resolveCredential:
-      credentialsService && typeof credentialsService.resolve === 'function'
-        ? (credentialName) => {
-            try {
-              return credentialsService.resolve(credentialName)
-            } catch (error) {
-              return Promise.reject(error)
-            }
-          }
-        : undefined,
-    log: (message) => ctx.logger?.warn?.(`dsh-pet-astra-yao: ${message}`),
+    resolveCredential: (credentialName) => {
+      const service = credentialsService
+      if (!service || typeof service.resolve !== 'function') return Promise.resolve(null)
+      try {
+        return service.resolve(credentialName)
+      } catch (error) {
+        return Promise.reject(error)
+      }
+    },
+    log: (message) => loggerOf(ctx)?.warn?.(`dsh-pet-astra-yao: ${message}`),
   })
 
   const handlers = createHandlers({ tracker, store, balance })
