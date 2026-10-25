@@ -160,10 +160,15 @@ pnpm 会拉仓库、跑 `prepare` 重新生成 `lib/client.js`。这样装的是
   （`GET /balance?refresh=1` 可以强制刷新）。
 - 账户里的「充值余额」和「赠金」是两个钱包、各自扣款，所以余额按币种求和后显示，
   鼠标悬停能看到 `充值 50.00 + 赠金 2.73` 的拆分。
-- 今日消耗按「余额下降」累计，账本存在 `%USERPROFILE%\.dsh\.dsh-pet-astra-yao-usage.json`，跨天自动归零；
+- 今日消耗优先用**平台自己的用量接口**：读取 DSH 存下的账户登录凭证
+  （`%USERPROFILE%\.dsh\.credentials.yaml` 里的 `deepseek-account-platform/default`），
+  请求 `GET https://platform.deepseek.com/api/v0/usage/by_api_key/cost?start=<当天零点>&end=<次日零点>&tz=<时区秒>`
+  （请求头 `x-dsh-auth-token`），把按小时的成本序列求和。这和 platform.deepseek.com 用量页
+  「今日 Cost」是同一个数，覆盖账号下所有 API Key，也不受插件什么时候启动影响。
+  凭证只用于这一次只读查询，不写回、不落盘；没有凭证或接口失败时自动退回下面的估算。
+- 估算（退路）按「余额下降」累计，账本存在 `%USERPROFILE%\.dsh\.dsh-pet-astra-yao-usage.json`，跨天自动归零；
   充值导致余额上升时不会记成负消耗。它只能统计**观测到之后**的下降，所以悬停提示里会写明
-  「今日 ¥0.90（13:02 起观测）」——今天中途才开始跑的话，这个数字只覆盖那之后的部分，
-  过了零点就会自动变成完整的一天。
+  「今日 ¥0.90（13:02 起观测）」；精确数字可用时提示写的是「今日 ¥9.23（平台用量统计）」，并列出各 Key 分项。
 - 没配置 Key、或者当前 DSH 没有暴露 `credentials` / `deepseekAccount` 服务时，气泡显示「余额不可用：未配置 API Key」，
   桌宠其它功能不受影响。DSH 的凭据服务里没有这个 Key 时，服务端会退一步读环境变量
   `DEEPSEEK_API_KEY`，所以在启动 DSH 的环境里导出它同样能显示余额。

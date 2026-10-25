@@ -528,7 +528,19 @@ test('balance endpoint returns the service payload and refuses non-GET', async (
       return { ok: true, totalBalance: 12.5, currency: 'CNY', todayUsage: 0.35, updatedAt: '2026-10-24T04:00:00.000Z' }
     },
   }
-  const handlers = createHandlers({ tracker, store, balance, version: '9.9.9' })
+  const usage = {
+    async getTodayCost() {
+      return {
+        ok: true,
+        cost: 9.2306,
+        currency: 'CNY',
+        byKey: [{ name: 'labor-agent', cost: 8.6946 }],
+        from: '2026-10-24T16:00:00.000Z',
+        to: '2026-10-25T16:00:00.000Z',
+      }
+    },
+  }
+  const handlers = createHandlers({ tracker, store, balance, usage, version: '9.9.9' })
 
   const res = response()
   await handlers.serveBalance(request({ url: '/plugins/dsh-pet-astra-yao/balance' }), res)
@@ -538,6 +550,8 @@ test('balance endpoint returns the service payload and refuses non-GET', async (
   assert.equal(body.balance.totalBalance, 12.5)
   assert.equal(body.balance.todayUsage, 0.35)
   assert.equal(body.balance.currency, 'CNY')
+  assert.equal(body.balance.todaySpend.cost, 9.2306)
+  assert.equal(body.balance.todaySpend.byKey[0].name, 'labor-agent')
   assert.equal(forced, false)
 
   const fresh = response()
@@ -552,4 +566,5 @@ test('balance endpoint returns the service payload and refuses non-GET', async (
   const none = response()
   await unavailable.serveBalance(request(), none)
   assert.equal(json(none).balance.code, 'NO_SERVICE')
+  assert.equal(json(none).balance.todaySpend, null, 'no usage service means no exact figure')
 })

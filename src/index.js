@@ -21,6 +21,7 @@ import { readFileSync } from 'node:fs'
 import { localHostOk } from './local-access.js'
 import { createTracker } from './state.js'
 import { createBalanceService } from './balance.js'
+import { createUsageService } from './usage.js'
 import { readAccountOutcome } from './account.js'
 import { SPRITE_VERSION, describeAtlas } from './atlas.js'
 import { CONFIG_PATCH_FIELDS, applyPatch, defaults, normalizeConfig, readConfig } from './config.js'
@@ -111,7 +112,7 @@ async function readJsonBody(req, limit = 8192) {
  * @param {{ spritesheet?: string | URL, manifest?: string | URL }} [deps.assets]
  * @param {ReturnType<typeof createBalanceService>} [deps.balance]
  */
-export function createHandlers({ tracker, store, assets = {}, version = VERSION, balance = null }) {
+export function createHandlers({ tracker, store, assets = {}, version = VERSION, balance = null, usage = null }) {
   const spriteFile = assets.spritesheet ?? new URL('../spritesheet.webp', import.meta.url)
   const manifestFile = assets.manifest ?? new URL('../pet.json', import.meta.url)
   const fileCache = new Map()
@@ -219,12 +220,30 @@ export function createHandlers({ tracker, store, assets = {}, version = VERSION,
       return
     }
     if (!balance) {
-      jsonResponse(res, 200, { ok: false, balance: { ok: false, code: 'NO_SERVICE', error: '余额服务不可用' } })
+      jsonResponse(res, 200, {
+        ok: false,
+        balance: { ok: false, code: 'NO_SERVICE', error: '余额服务不可用', todaySpend: null },
+        serverTime: Date.now(),
+      })
       return
     }
     const force = /[?&](?:refresh|force)=1(?:&|$)/u.test(String(req?.url ?? ''))
     const payload = await balance.getBalance({ force })
-    jsonResponse(res, 200, { ok: payload.ok === true, balance: payload, serverTime: Date.now() })
+    // The platform's own per-hour cost series is exact; the wallet-delta figure
+    // above can only start counting once the plugin is running. Ship both and
+    // let the bubble print the exact one when it is available.
+    let todaySpend = null
+    if (usage && typeof usage.getTodayCost === 'function') {
+      try {
+        const spend = await usage.getTodayCost({ force })
+        todaySpend = spend?.ok === true
+          ? { ok: true, cost: spend.cost, currency: spend.currency, byKey: spend.byKey, from: spend.from, to: spend.to }
+          : { ok: false, code: spend?.code ?? 'ERROR', error: spend?.error ?? '用量查询失败' }
+      } catch (error) {
+        todaySpend = { ok: false, code: 'ERROR', error: String(error?.message ?? error).slice(0, 120) }
+      }
+    }
+    jsonResponse(res, 200, { ok: payload.ok === true, balance: { ...payload, todaySpend }, serverTime: Date.now() })
   }
 
   async function serveSpritesheet(req, res) {
@@ -424,9 +443,20 @@ export function mount(ctx, config = {}) {
     log: (message) => loggerOf(ctx)?.warn?.(`dsh-pet-astra-yao: ${message}`),
   })
 
-  const handlers = createHandlers({ tracker, store, balance })
+  const usage = createUsageService({
+    readRecord: async (key) => {
+      const service = credentialsService
+      if (!service || typeof service.readRecord !== 'function') return null
+      return service.readRecord(key)
+    },
+    version: VERSION,
+    tzOffsetSeconds: () => -new Date().getTimezoneOffset() * 60,
+    log: (message) => loggerOf(ctx)?.warn?.(`dsh-pet-astra-yao: ${message}`),
+  })
+
+  const handlers = createHandlers({ tracker, store, balance, usage })
   registerRoutes(ctx, { handlers })
-  return { tracker, store, handlers, balance }
+  return { tracker, store, handlers, balance, usage }
 }
 
 /** Cordis plugin entry. */

@@ -941,6 +941,45 @@ test('the balance bar tooltip names the wallets and when counting started', asyn
   assert.match(purse.title, /登录账户钱包/u)
 })
 
+test('the bar prints the platform usage figure instead of the sampled delta', async () => {
+  // Sampling the wallet can only start counting when the plugin does; the
+  // platform's per-hour cost series is the number its own usage page shows, so
+  // the bar has to prefer it whenever the host managed to read it.
+  const { env } = applyWidget({
+    fetch: balanceFetch({
+      session: IDLE_SESSION,
+      config: { showBalanceBar: true },
+      balance: {
+        ok: true,
+        totalBalance: 41.37,
+        currency: 'CNY',
+        todayUsage: 5.88,
+        observedSince: '2026-10-25T02:57:35.938Z',
+        source: 'account',
+        todaySpend: {
+          cost: 9.2306,
+          currency: 'CNY',
+          byKey: [
+            { name: 'labor-agent', cost: 8.6946 },
+            { name: 'DeepSeek Harness', cost: 0.536 },
+          ],
+        },
+      },
+    }),
+  })
+  const shadow = env.body.children[0]._shadow
+  const purse = shadow.querySelector('.purse')
+  env.pump(0)
+  env.runTimer()
+  await settle()
+
+  assert.equal(shadow.querySelector('.purse-value').textContent, '¥41.37 · 今日 ¥9.23')
+  assert.match(purse.title, /今日 ¥9\.23（平台用量统计）/u)
+  assert.match(purse.title, /labor-agent 8\.69/u)
+  assert.match(purse.title, /DeepSeek Harness 0\.54/u)
+  assert.doesNotMatch(purse.title, /起观测/u, 'the sampled window is only a fallback')
+})
+
 test('the balance bar reports a missing key instead of inventing a number', async () => {
   const { env } = applyWidget({
     fetch: balanceFetch({

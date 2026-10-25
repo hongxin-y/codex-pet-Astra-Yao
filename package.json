@@ -1,7 +1,7 @@
 {
   "name": "dsh-pet-astra-yao",
-  "version": "0.1.5",
-  "description": "Astra Yao 鈥?a Codex-style desktop pet for DeepSeek Harness, rendered from the Codex v2 spritesheet atlas",
+  "version": "0.1.6",
+  "description": "Astra Yao 閳?a Codex-style desktop pet for DeepSeek Harness, rendered from the Codex v2 spritesheet atlas",
   "type": "module",
   "main": "src/index.js",
   "exports": {

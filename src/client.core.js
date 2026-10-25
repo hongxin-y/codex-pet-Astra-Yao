@@ -728,13 +728,30 @@ function subText() {
   return parts.join(' · ')
 }
 
+/**
+ * Today's spend as the platform measures it, when the host managed to read it.
+ * This is the authoritative number; `todayUsage` is only what we happened to
+ * observe by sampling the wallet.
+ */
+function exactTodaySpend() {
+  const spend = balanceData?.ok === true ? balanceData.todaySpend : null
+  // The host only attaches `ok: false` when the usage query failed; a plain
+  // `{ cost, currency }` is the success shape.
+  if (!spend || spend.ok === false) return null
+  const cost = Number(spend.cost)
+  return Number.isFinite(cost) ? cost : null
+}
+
 function usageText() {
   if (!cfg.showBubbleUsage) return ''
   if (balancePending && !balanceData) return '余额查询中…'
   if (!balanceData) return ''
   if (balanceData.ok) {
     const symbol = balanceSymbol(balanceData.currency)
-    const today = Number(balanceData.todayUsage) > 0 ? ` · 今日 ${symbol}${money(balanceData.todayUsage)}` : ''
+    const exact = exactTodaySpend()
+    const today = exact !== null
+      ? ` · 今日 ${symbol}${money(exact)}`
+      : Number(balanceData.todayUsage) > 0 ? ` · 今日 ${symbol}${money(balanceData.todayUsage)}` : ''
     return `余额 ${symbol}${money(balanceData.totalBalance)}${today}${balanceData.stale ? '（缓存）' : ''}`
   }
   const reason = balanceData.code === 'NO_KEY' ? '未配置 API Key' : shorten(balanceData.error, 40) || '不可用'
@@ -787,7 +804,10 @@ function purseText() {
   if (!balanceData) return balancePending ? '查询中…' : ''
   if (balanceData.ok) {
     const symbol = balanceSymbol(balanceData.currency)
-    const today = Number(balanceData.todayUsage) > 0 ? ` · 今日 ${symbol}${money(balanceData.todayUsage)}` : ''
+    const exact = exactTodaySpend()
+    const today = exact !== null
+      ? ` · 今日 ${symbol}${money(exact)}`
+      : Number(balanceData.todayUsage) > 0 ? ` · 今日 ${symbol}${money(balanceData.todayUsage)}` : ''
     return `${symbol}${money(balanceData.totalBalance)}${today}`
   }
   if (balanceData.code === 'NO_KEY') return '未配置 Key'
@@ -816,7 +836,15 @@ function purseTitle() {
   if (wallets.length > 1) {
     lines.push(wallets.map((wallet) => `${wallet.kind === 'bonus' ? '赠金' : '充值'} ${money(wallet.balance)}`).join(' + '))
   }
-  if (Number(balanceData.todayUsage) > 0) {
+  const exact = exactTodaySpend()
+  if (exact !== null) {
+    lines.push(`今日 ${symbol}${money(exact)}（平台用量统计）`)
+    const spend = balanceData.todaySpend
+    const byKey = Array.isArray(spend?.byKey) ? spend.byKey.filter((entry) => Number(entry.cost) > 0) : []
+    if (byKey.length > 1) {
+      lines.push(byKey.map((entry) => `${entry.name} ${money(entry.cost)}`).join(' · '))
+    }
+  } else if (Number(balanceData.todayUsage) > 0) {
     const since = clockLabel(balanceData.observedSince)
     lines.push(`今日 ${symbol}${money(balanceData.todayUsage)}${since ? `（${since} 起观测）` : ''}`)
   }
