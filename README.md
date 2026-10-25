@@ -1,208 +1,196 @@
-# Astra Yao · DSH 桌宠插件
+# Astra Yao · Codex 桌宠 ⇄ DSH 插件
 
-把 [Codex Pet: Astra Yao](https://github.com/hongxin-y/codex-pet-Astra-Yao) 的像素桌宠做成了
-DeepSeek Harness（DSH）可以识别的插件：装进 profile 之后，Astra Yao 会以悬浮小人的形式待在 DSH Web 界面
-右下角，跟着会话状态换动作——思考时翻谱、执行命令时小跑、等你确认时托腮等待、出错时躺平。
+<img src="assets/icon-180.png" width="96" align="right" alt="Astra Yao">
 
-头顶还有一个状态气泡：写着当前状态、正在跑的工具、报错原文，可选显示 DeepSeek 账户余额和今日消耗。
+同一个仓库，两份可直接用的产物：
 
-- 角色：深墨绿长发、红黑外套、白裙、金色环形麦克风立杖的舞台歌手像素小人
-- 素材：`spritesheet.webp`，1536×2288，Codex v2 atlas（8 列 × 11 行，单帧 192×208），透明背景
-- 形态：一个标准的 DSH 插件包（`package.json` 里的 `dsh.bundle` + `dsh.client`），
-  服务端一半负责会话状态与 HTTP 接口，浏览器一半负责把 sprite 画到页面上
+- **DeepSeek Harness（DSH）插件** —— 装进 profile 后，Astra Yao 悬浮在 Web 界面右下角，
+  跟着会话状态换动作，头顶有状态气泡、脚下有余额条。
+- **Codex 桌宠素材包** —— `pet.json` + `spritesheet.webp`，复制到 `%USERPROFILE%\.codex\pets\astra-yao` 即可给 Codex 用。
+
+两边共用同一张 1536×2288 的 Codex v2 图集（8 列 × 11 行，单帧 192×208），没有第二份拷贝。
+
+角色：深墨绿长发、红黑外套、白裙、金色环形话筒立杖的舞台歌手像素小人。
+它在 DSH 里的状态按她的口吻来写——**后台待机 / 构思中 / 执行中 / 候场中 / 破音了**。
+
+> **English:** Astra Yao is a Codex-v2 sprite-atlas desktop pet that also ships as a DeepSeek Harness
+> plugin. The server half follows session events (idle / thinking / running tools / waiting for approval /
+> failed) and exposes a small loopback HTTP API; the browser half paints the sprite in a shadow-root
+> widget with drag-to-move, a status bubble, a right-click menu, 16-direction pointer look, and an optional
+> DeepSeek balance bar whose "today" figure comes from the platform usage endpoint.
+> Install: `dsh plugin --profile desktop add <path-to-this-repo>`.
 
 ## 两个身份
 
-这个仓库同时是两样东西，互不干扰：
-
-| 你是谁 | 怎么用 | 需要的文件 |
+| 你是 | 怎么用 | 需要的文件 |
 | --- | --- | --- |
-| DSH 用户 | `dsh plugin --profile desktop add <本仓库路径>`（见下文「安装」） | `package.json`、`cordis.patch.yml`、`src/`、`lib/` |
-| Codex 用户 | 把仓库里的 `pet.json` + `spritesheet.webp` 复制到 `%USERPROFILE%\.codex\pets\astra-yao\`（见 [USAGE.md](USAGE.md)） | 仍然只有 `pet.json` + `spritesheet.webp` |
+| DSH 用户 | `dsh plugin --profile desktop add <本仓库路径>` | `package.json`、`cordis.patch.yml`、`src/`、`lib/`、`spritesheet.webp` |
+| Codex 用户 | 把 `pet.json` + `spritesheet.webp` 放进 `%USERPROFILE%\.codex\pets\astra-yao\`（见 [USAGE.md](USAGE.md)） | 只有 `pet.json` + `spritesheet.webp` |
 
-Codex 只认这两个文件，所以 DSH 那套 `package.json`、`src/`、`test/` 放在同一层不影响它；
-反过来，DSH 的 sprite 也直接读根目录的 `spritesheet.webp`，没有第二份拷贝。
+Codex 只认这两个文件，所以 DSH 那套 `src/`、`test/`、`lib/` 放在同一层不影响它；DSH 的 sprite 也直接读根目录图集。
 
-> **English:** Astra Yao is a Codex v2 sprite-atlas pet for the DeepSeek Harness web GUI. One 1536×2288
-> atlas (8×11 frames of 192×208) drives nine animations; the server half follows session events, so the pet
-> idles, thinks, runs while tools are working and waits on approvals. The browser half paints it in a
-> shadow-root widget with drag-to-move, a status bubble, a right-click menu and pointer-look that follows a
-> nearby cursor. The bubble keeps a stage-flavoured status line and rotates backstage quips while the pet is idle,
-> and can also show the DeepSeek account balance and today's spend.
-> Install with `dsh plugin --profile desktop add <path-to-this-repo>`.
+## 看效果
 
-## 目录
+<p align="center">
+  <img src="docs/shot-dsh.png" width="300" alt="DSH 里的 Astra Yao：状态气泡 + 脚下余额条">
+</p>
 
-```text
-pet-astra-yao/
-|-- package.json          # DSH 插件清单：dsh.bundle / dsh.client / exports
-|-- cordis.patch.yml      # 插件行：装进 profile 的那一条 insert
-|-- src/
-|   |-- index.js          # 服务端插件：会话跟踪、配置、/plugins/dsh-pet-astra-yao/* 接口
-|   |-- state.js          # 会话事件 → 桌宠状态（纯函数，便于测试）
-|   |-- atlas.js          # Codex atlas 契约：行列、帧数、方向、取帧算法
-|   |-- balance.js        # DeepSeek 余额查询 + 今日消耗记账
-|   |-- account.js        # 账户钱包（充值 + 赠金）→ 余额的纯映射
-|   |-- config.js         # 配置归一化与 PATCH 校验
-|   `-- client.core.js    # 浏览器端源码（影子 DOM、拖拽、气泡、右键菜单、轮询）
-|-- scripts/
-|   |-- build-client.mjs  # 把 client.core.js 打包成 lib/client.js
-|   |-- verify.mjs        # 安装前自检：清单、补丁、bundle、atlas
-|   `-- audit-atlas.py    # 图集体检：帧数、行内高度、脚底基线（Pillow）
-|-- docs/atlas-brief.md   # 给画图方的重制需求：现状问题 + 一致性规则 + 验收
-|-- lib/client.js         # 构建产物（已提交，DSH 启动时直接加载）
-|-- test/                 # node:test 单测（atlas / state / config / balance / account / client / host / server）
-|-- assets/icon-180.png   # 插件市场图标（从图集待机帧裁出来）
-|-- pet.json              # Codex 宠物清单（保留，Codex 端仍可用）
-|-- spritesheet.webp      # 图集，同时被 DSH 插件以 /assets 接口提供
-|-- USAGE.md              # 原 Codex 桌面端安装说明
-`-- README.md
-```
+<p align="center"><sub>DSH 右下角：状态气泡写着「构思中」，脚下是点击可刷新的余额条</sub></p>
 
-## 安装到 DSH
+五种状态共用同一套画法，切换时不跳身形、不换手：
 
-DSH 的插件是「profile 里的一个依赖 + 一条 bundle 记录」。本仓库根目录就是插件包，所以有两种装法。
+<img src="docs/states.webp" alt="五种状态">
 
-**方式一：命令行（推荐，路径换成你本地的仓库位置）**
+| 会话在做什么 | 它做什么 |
+| --- | --- |
+| 空闲 | 待机呼吸、眨眼，气泡每 9 秒轮换一句她的台词 |
+| 模型在思考 | 托腮构思（`review`） |
+| 有工具在跑 | 小跑（`running`），气泡写工具名 |
+| 等你确认 / 回答 | 托腮候场（`waiting`），气泡写等你做什么 |
+| 出错 | 低头破音（`failed`），点一下「我知道了」即恢复 |
+
+鼠标靠近 280 px 内她会沿 16 个屏幕方向看向光标，移开 2.5 秒后回到待机：
+
+<img src="docs/look-directions.webp" width="420" alt="16 个屏幕方向">
+
+## 装进 DSH
+
+DSH 的插件 = profile 里的一个依赖 + 一条 bundle 记录。仓库根目录就是插件包。
+
+**命令行（开发时推荐，`link:` 指向工作区，改代码即时生效）**
 
 ```powershell
 dsh plugin --profile desktop add D:\Repos\pet-astra-yao
 ```
 
-这一步把包装进 profile 的 `node_modules`，并把包名追加到 profile 的 `dsh.profile.bundles`。
-如果你用的 DSH 版本没自动追加，就在 `%USERPROFILE%\.dsh\profiles\desktop\package.json` 里手动补一行：
+这一步会把包链进 profile 的 `node_modules`，并把包名追加到 profile 的 `dsh.profile.bundles`。
+少数版本不会自动追加，这时在 `%USERPROFILE%\.dsh\profiles\desktop\package.json` 里补一行
+`"bundles": [ "...原有的...", "dsh-pet-astra-yao" ]`。
 
-```json
-"dsh": {
-  "profile": {
-    "bundles": [ "...原有的那些 bundle...", "dsh-pet-astra-yao" ]
-  }
-}
-```
+**图形界面** —— DSH Web 的「设置 → 插件 → 从本地路径安装」，装完点「立即启用」，配置会渲染成表单。
 
-（`"...原有的那些 bundle..."` 用文件里原本的条目替换，别把别的插件挤掉。）
-
-**方式二：图形界面**
-
-打开 DSH Web 的「设置 → 插件」，用「从本地路径安装」填本仓库的绝对路径，装完点「立即启用」。
-插件页会读到 `cordis.patch.yml`，把配置渲染成表单。
-
-**方式三：直接从 GitHub 装（不用先克隆）**
+**直接从 GitHub 装（不用克隆）**
 
 ```powershell
 dsh plugin --profile desktop add github:hongxin-y/codex-pet-Astra-Yao
 ```
 
-pnpm 会拉仓库、跑 `prepare` 重新生成 `lib/client.js`。这样装的是独立副本，改代码不会热更新，
-开发时用方式一（`link:` 指向工作区）。
+pnpm 会拉仓库并跑 `prepare` 生成 `lib/client.js`；这是独立副本，改代码不会热更新。
 
-装好后刷新页面：右下角出现 Astra Yao 即成功。它和别的桌宠插件（例如 `dsh-pet-remielle`）可以同时存在，
-各自记住自己的位置。
+装好后刷新页面：右下角出现 Astra Yao 即成功。它可与其他桌宠插件（如 `dsh-pet-remielle`）共存，各自记位置。
 
-改完代码或换了 `spritesheet.webp` 之后：重启一次 DSH（host 与浏览器两半都在启动时装载），
-之后刷新页面即可。图集文件本身按 `mtime` + `ETag` 校验，替换图片不需要清浏览器缓存；
-只有 host 代码变更才需要重启。
+### 更新之后要做什么
 
-> **DSH 0.2.1-rc.3 起** cordis 会拒绝读取未经 `inject` 声明的服务（`cannot get property "x" without inject`），
-> 直接读 `ctx.credentials` 会让 host 半边在启动时静默失败——表现是桌宠只剩气泡、写着「未连接」。
-> 本插件（0.1.1+）改成全部通过 `ctx.inject([...], scoped => …)` 取服务，缺服务时功能降级而不是报错。
+| 改了什么 | 需要 |
+| --- | --- |
+| `src/*.js`（服务端、配置 schema） | 重启一次 DSH |
+| `lib/client.js`（浏览器端） | 刷新页面 |
+| `spritesheet.webp`（图集） | 什么都不用做：按 `mtime` + ETag 校验，客户端还会带 `?v=<sheetVersion>` 换 URL |
+| `cordis.patch.yml` 新增字段 | 重启一次 DSH |
+
+> **DSH 0.2.1-rc.3 起** cordis 拒绝读取未经 `inject` 声明的服务（`cannot get property "x" without inject`）。
+> 直接读 `ctx.credentials` 会让服务端半边在启动时静默失败，表现是只剩气泡、写着「未连接」。
+> 本插件（0.1.1+）全部通过 `ctx.inject([...], scoped => …)` 取服务，缺服务时降级而不是报错。
+
+## 给 Codex 用
+
+```powershell
+$dest = "$env:USERPROFILE\.codex\pets\astra-yao"
+New-Item -ItemType Directory -Force $dest | Out-Null
+Copy-Item pet.json, spritesheet.webp $dest
+```
+
+细节（目录结构、版本号、常见问题）见 [USAGE.md](USAGE.md)。
 
 ## 交互
 
 | 操作 | 效果 |
 | --- | --- |
-| 拖动 | 移动位置（拖动时播放左右跑），松手后坐标存回配置；`locked` 时不可拖 |
-| 单击 | 戳一下：原地挥手（图集第 3 行 4 帧），气泡应一句「在呢～／叫我？」；若当前是报错状态，则点一下即「我知道了」，回到待机 |
-| 右键 | 打开菜单：显示桌宠、大小、不透明度、动画速度、锁定位置、左右镜像、跟随光标、状态气泡、显示余额、回右下角、我知道了 |
+| 拖动 | 移动位置（拖动时播放左右跑），松手存回配置；`locked` 时不可拖 |
+| 单击 | 原地挥手（第 3 行 4 帧）并应一句「在呢～／叫我？」；报错状态下点一下即「我知道了」 |
+| 右键 | 菜单：显示桌宠、大小、不透明度、动画速度、锁定位置、左右镜像、跟随光标、状态气泡、显示余额、余额条、回右下角、我知道了 |
 | 隐藏后 | 右下角留一个小圆点，点它把桌宠叫回来 |
-| 鼠标移动 | 待机时、且光标距离桌宠 280 px 以内，沿图集第 9–10 行的 16 个屏幕方向环绕看向光标（上、右、下、左）；光标停住约 2.5 秒或离开范围后回到待机动画。可在菜单里关掉「跟随光标」 |
 
-状态在「思考 ↔ 执行」之间抖动时，动画不会跟着一秒一重启：升级（执行、等待、报错）立刻切换，
-回落要等当前动作播满 1.5 秒，所以小跑会连续跑下去，而不是原地抽动。
+「思考 ↔ 执行」来回抖动时动画不会一秒一重启：升级（执行、等待、报错）立即切换，回落要等当前动作播满 1.5 秒。
 
 ## 状态映射
 
-服务端订阅 DSH 的会话事件，折算成一个状态后再喂给客户端：
+服务端订阅 DSH 会话事件，折算成状态再喂给客户端：
 
-| DSH 会话 | 桌宠 |
+| DSH 会话事件 | 桌宠 |
 | --- | --- |
-| `turn/start` | 构思中（`review`，托腮） |
-| `tool/call`（有工具在跑） | 执行中（`running`，小跑） |
-| `ask_user_question` / `exit_plan_mode` / `approval/asked` | 候场中（`waiting`，托腮） |
-| `turn/end` 且 `reason.kind === "completed"` | 后台待机 + 谢幕跳一下（`jumping`，5 秒内一次） |
-| 工具报错 / 异常结束 | 破音了（`failed`，低头），点一下或开始下一轮对话后恢复 |
-| `turn/end` 且 `blocked` | 候场中 |
-| `turn/end` 且 `aborted` / `disposed` | 后台待机 |
+| `turn/start` | 构思中（`review`） |
+| `tool/call`（有工具在跑） | 执行中（`running`） |
+| `ask_user_question` / `exit_plan_mode` / `approval/asked` | 候场中（`waiting`） |
+| `turn/end` + `reason.kind === "completed"` | 后台待机 + 谢幕跳一下（`jumping`，5 秒内一次） |
+| 工具报错 / 异常结束 | 破音了（`failed`），点一下或开下一轮恢复 |
+| `turn/end` + `blocked` | 候场中 |
+| `turn/end` + `aborted` / `disposed` | 后台待机 |
 
-子会话默认被忽略；把 `includeSubagents` 打开后，子代理的活动也会驱动桌宠。
+子会话默认忽略；打开 `includeSubagents` 后子代理的活动也会驱动桌宠。
 
-## 状态气泡与余额
+## 气泡、台词与余额
 
-桌宠头顶的气泡会写三行：当前状态、细节（正在跑的工具 / 等你确认的类型 / 报错原文）、当前会话的项目和标题。
-状态用她的口吻：**后台待机 / 构思中 / 执行中 / 候场中 / 破音了**——只有「执行中」保留直白说法，
-免得看不出是在跑工具。待机时整块换成她的台词，每 9 秒轮换一句：
+气泡写三行：状态、细节（工具名 / 等你做什么 / 报错原文）、项目 · 会话标题。
+它贴着桌宠所在那一侧展开，小尖角指向桌宠；顶部放不下时翻到下方，最小 128 px、最大 240 px。
+
+待机时整块换成她的台词，每 9 秒轮换：
 
 > 今夜，星光灿烂。 / 这个世界上最闪亮的东西，当然是爱！ / 一段安宁的间奏，正好休息～ /
 > 短暂的停顿，会让旋律更甜。 / 要不要听首歌？咳—— / 让旋律带着你走～
 
-前两句出自官方角色介绍与角色 PV 标题，其余取自她的游戏内语音（待机 / 都市漫游），英文语音的条目由本插件译为中文。
-任务完成那几秒会先显示「完美谢幕～」。
-气泡贴着桌宠所在那一侧的边缘展开，底部的小尖角始终指向桌宠；贴到屏幕顶端放不下时自动翻到桌宠下方。
-最小宽度 128 px、最大 240 px，文案变长时换行而不是把气泡撑到半个屏幕。
-右键菜单里的「状态气泡」可以整个关掉它。
+前两句出自官方角色介绍与角色 PV 标题，其余取自游戏内语音（待机 / 都市漫游），英文条目由本插件译为中文。
+任务完成那几秒先显示「完美谢幕～」。
 
-「显示余额」打开后，第三行换成 DeepSeek 账户余额和今日消耗：
+**余额**有三个来源，按顺序尝试，都没有才显示「未配置 Key」，不编数字：
 
-- 余额有两个来源，按顺序尝试：先用 DSH 自己的 `deepseekAccount` 账户服务读登录账户的钱包
-  （**账户登录不需要 API Key**）；读不到账户钱包时再退到 `credentials` 里的 `DEEPSEEK_API_KEY`，
-  最后才退到环境变量 `DEEPSEEK_API_KEY`。都没配置时显示「未配置 Key」，不会假装有数字。
-  接口是 `https://api.deepseek.com/user/balance`（Key 模式），60 秒缓存，浏览器端每 60 秒最多拉一次
-  （`GET /balance?refresh=1` 可以强制刷新）。
-- 账户里的「充值余额」和「赠金」是两个钱包、各自扣款，所以余额按币种求和后显示，
-  鼠标悬停能看到 `充值 50.00 + 赠金 2.73` 的拆分。
-- 今日消耗优先用**平台自己的用量接口**：读取 DSH 存下的账户登录凭证
-  （`%USERPROFILE%\.dsh\.credentials.yaml` 里的 `deepseek-account-platform/default`），
-  请求 `GET https://platform.deepseek.com/api/v0/usage/by_api_key/cost?start=<当天零点>&end=<次日零点>&tz=<时区秒>`
-  （请求头 `x-dsh-auth-token`），把按小时的成本序列求和。这和 platform.deepseek.com 用量页
-  「今日 Cost」是同一个数，覆盖账号下所有 API Key，也不受插件什么时候启动影响。
-  凭证只用于这一次只读查询，不写回、不落盘；没有凭证或接口失败时自动退回下面的估算。
-- 估算（退路）按「余额下降」累计，账本存在 `%USERPROFILE%\.dsh\.dsh-pet-astra-yao-usage.json`，跨天自动归零；
-  充值导致余额上升时不会记成负消耗。它只能统计**观测到之后**的下降，所以悬停提示里会写明
-  「今日 ¥0.90（13:02 起观测）」；精确数字可用时提示写的是「今日 ¥9.23（平台用量统计）」，并列出各 Key 分项。
-- 没配置 Key、或者当前 DSH 没有暴露 `credentials` / `deepseekAccount` 服务时，气泡显示「余额不可用：未配置 API Key」，
-  桌宠其它功能不受影响。DSH 的凭据服务里没有这个 Key 时，服务端会退一步读环境变量
-  `DEEPSEEK_API_KEY`，所以在启动 DSH 的环境里导出它同样能显示余额。
-- 余额只从你的机器直连 DeepSeek，不经过 DSH 的服务器；接口本身也只接受本机回环请求。
+1. DSH 的 `deepseekAccount` 服务读登录账户钱包（**账户登录不需要 API Key**）；
+2. `credentials` 里的 `DEEPSEEK_API_KEY`（`https://api.deepseek.com/user/balance`）；
+3. 环境变量 `DEEPSEEK_API_KEY`。
 
-### 脚下余额条
+充值与赠金是两个钱包、各自扣款，所以按币种求和显示，悬停能看到 `充值 50.00 + 赠金 2.73` 的拆分。
 
-「余额条」默认打开：桌宠脚下多一条药丸形状的小横条，写 `¥12.34 · 今日 ¥0.56`，点一下立刻刷新（跳过 60 秒缓存）。
-它跟着桌宠移动，缩放、拖拽、换位置都会重新贴合；没配 Key 时显示「未配置 Key」并变成暖色，不会假装有数字。
-悬停会列出钱包拆分、今日消耗的观测起点和余额来源（登录账户 / API Key）。
-右键菜单里的「余额条」可以单独关掉它，与气泡第三行的「显示余额」互不影响。
+**今日消耗**优先用平台自己的用量接口：读 DSH 存下的账户凭证
+（`~/.dsh/.credentials.yaml` 里的 `deepseek-account-platform/default`，只读、不落盘），请求
+
+```text
+GET https://platform.deepseek.com/api/v0/usage/by_api_key/cost
+    ?start=<当天零点>&end=<次日零点>&tz=<时区秒>      # 必须整点对齐，按小时分桶
+    [&api_key_tracking_id=<id>...]                  # 不传 = 账号下全部 Key
+Header: x-dsh-auth-token: <grant>
+```
+
+把序列求和，就是 platform.deepseek.com 用量页「今日 Cost」那个数——覆盖所有 Key，也不受插件何时启动影响。
+悬停会写 `今日 ¥12.15（平台用量统计）` 并列出各 Key 分项。
+
+拿不到凭证或接口失败时退回**估算**：按余额下降累计，账本在 `%USERPROFILE%\.dsh\.dsh-pet-astra-yao-usage.json`，
+跨天归零、充值不记负数；这种口径只能统计观测之后的下降，所以提示会写明「13:02 起观测」。
+
+**脚下余额条**默认打开：药丸形状的小横条写 `余额 ¥37.71 · 今日 ¥12.15`，点一下立即刷新。
+它跟着桌宠缩放、拖拽、换位；菜单里的「余额条」可单独关掉，与气泡第三行的「显示余额」互不影响。
 
 ## 配置
 
-配置存在 profile 的 `cordis.patch.yml`（也就是插件页表单背后的那份），字段如下：
+配置存在 profile 的 `cordis.patch.yml`，也就是插件页表单背后的那份：
 
 | 字段 | 默认 | 说明 |
 | --- | --- | --- |
-| `enabled` | `true` | 是否启用这个插件 |
+| `enabled` | `true` | 是否启用 |
 | `scale` | `1` | 缩放，0.5–2 |
 | `opacity` | `1` | 不透明度，0.3–1 |
-| `speed` | `1` | 动画速度，0.5–1.6（0.5 最慢，1.6 最快） |
+| `speed` | `1` | 动画速度，0.5–1.6 |
 | `mirror` | `false` | 左右镜像 |
-| `lookAtPointer` | `true` | 光标靠近时沿 360° 屏幕方向看向光标；可在菜单里关掉 |
+| `lookAtPointer` | `true` | 光标靠近时看向光标 |
 | `locked` | `false` | 锁定位置，禁止拖动 |
 | `hidden` | `false` | 隐藏（留一个小圆点） |
-| `paused` | `false` | 暂停逐帧动画，只画当前帧 |
-| `showBubble` | `true` | 显示头顶状态气泡 |
-| `showBubbleUsage` | `false` | 气泡里显示余额和今日消耗 |
-| `showBalanceBar` | `true` | 脚下显示一条余额小横条（点击刷新） |
+| `paused` | `false` | 暂停逐帧动画 |
+| `showBubble` | `true` | 头顶状态气泡 |
+| `showBubbleUsage` | `false` | 气泡里显示余额与今日消耗 |
+| `showBalanceBar` | `true` | 脚下余额条 |
 | `includeSubagents` | `false` | 子代理是否也驱动桌宠 |
-| `posX` / `posY` | `null` | 上次拖到的位置，`null` 表示贴右下角 |
+| `posX` / `posY` | `null` | 上次拖到的位置，`null` = 贴右下角 |
 
-拖拽、菜单里的改动会 `PATCH` 回服务端，服务端再写进配置作用域；下次打开页面自动恢复。
+菜单和拖拽的改动会 `PATCH` 回服务端并写进配置作用域，下次打开自动恢复。
 
 ## HTTP 接口
 
@@ -210,70 +198,86 @@ pnpm 会拉仓库、跑 `prepare` 重新生成 `lib/client.js`。这样装的是
 
 | 方法 | 路径 | 用途 |
 | --- | --- | --- |
-| `GET` | `/state` | 一次快照：插件版本、配置、图集描述、当前会话状态 |
-| `GET` `PATCH` `POST` | `/config` | 读配置 / 合并式改配置（未知字段 400） |
-| `POST` | `/ack` | 清掉报错状态（桌宠「我知道了」） |
+| `GET` | `/state` | 快照：插件版本、配置、图集描述、当前会话状态 |
+| `GET` `PATCH` `POST` | `/config` | 读 / 合并式改配置（未知字段 400） |
+| `POST` | `/ack` | 清掉报错状态 |
 | `GET` | `/balance` | 余额 + 今日消耗（`?refresh=1` 跳过 60 秒缓存） |
-| `GET` | `/spritesheet` | 图集本体，`image/webp`（带 `ETag`，按 `mtime` 校验，换图即生效） |
-| `GET` | `/manifest` | `pet.json`（同样带 `ETag`） |
+| `GET` | `/spritesheet` | 图集本体，`image/webp`，带 `ETag` |
+| `GET` | `/manifest` | `pet.json`，同样带 `ETag` |
 
-客户端不依赖任何前端框架，只用 DSH 的基线模块，所以 `dsh.client.inject` 是空数组。
+客户端不依赖任何前端框架，只用 DSH 基线模块，所以 `dsh.client.inject` 是空数组。
+服务端对 `@deepseek-ai/schemastery` 是「有则用、无则跳」：`link:` 安装不会装它的依赖，
+拿不到 schema 时插件照常跑，只是插件页没有表单。
 
-服务端对 `@deepseek-ai/schemastery` 是「有则用、无则跳」：`dsh plugin add <本地路径>` 的 link 安装不会装这个包的
-依赖，拿不到布局描述（schema）时插件照常跑，只是「设置 → 插件」里没有表单；registry 安装则会正常解析。
+## 图集
+
+<img src="docs/atlas-overview.webp" alt="11 行图集总览">
+
+| 行 | 内容 | 播放 |
+| --- | --- | --- |
+| 0 | 待机（呼吸、眨眼） | 6 帧 / 160 ms |
+| 1–2 | 向右跑 / 向左跑 | 8 帧 / 120 ms |
+| 3 | 挥手 | 单击播 4 帧 / 200 ms |
+| 4 | 跳跃（收尾谢幕用） | 5 帧 / 140 ms |
+| 5 | 出错（低头、叹气） | 8 帧 / 140 ms |
+| 6 | 等待（托腮） | 6 帧 / 150 ms |
+| 7 | 执行中（专注、手指计数） | 6 帧 / 120 ms |
+| 8 | 思考（托腮、目光微动） | 6 帧 / 360 ms |
+| 9–10 | 16 个屏幕方向（0° 朝上，顺时针每 22.5° 一格） | 默认跟随光标，2.5° 迟滞 |
+
+固定约定：所有行共用同一人物设定与脚底基线，持杖手固定在画面左侧，动作里抬起的是另一只手；
+跨行切换时裙摆、腿部站姿和法杖位置不跳。
+
+```powershell
+python scripts/audit-atlas.py spritesheet.webp   # 行高、宽度、脚底基线、朝向两行、面部区域
+```
+
+`OK` 只代表结构通过，人物比例与动作连贯仍需目检；判定标准和逐行要求写在
+[`docs/atlas-brief.md`](docs/atlas-brief.md)，本轮复查记录见 [`docs/atlas-review.md`](docs/atlas-review.md)，
+逐状态动图在 [`docs/atlas-qa/`](docs/atlas-qa/)，编译用的母版与注册信息在
+[`assets/atlas-source/coherent/`](assets/atlas-source/coherent/)。
 
 ## 开发
 
 ```powershell
-npm run build     # 改完 src/client.core.js 后重新生成 lib/client.js
-npm run build:atlas # 原样打包已审阅的固定格素材（Python + Pillow）
-npm run verify    # 自检：清单字段、补丁行、bundle、图集尺寸（1536×2288 / v2）
-npm test          # node:test：atlas / config / state / balance / client / host / server
-npm run test:atlas # Pillow：图集审计脚本的回归用例
-python -B test/pack_atlas_test.py # 编码像素不变、异常时保留旧图集
-python scripts/preview-atlas.py # 从正式 WebP 生成逐帧预览与母版固定裁块
-
-# 换图集之后先跑这个（需要 Pillow）：格式、透明度、连续帧数、含道具的占用边界
-python scripts/audit-atlas.py spritesheet.webp
+npm run build      # 改完 src/client.core.js 后重新生成 lib/client.js
+npm run verify     # 清单字段、补丁行、bundle、图集尺寸自检
+npm test           # node:test：atlas / config / state / client / host / server / balance / account / usage
+npm run test:atlas # Pillow：审计脚本回归
+python -B test/pack_atlas_test.py   # 打包器：像素不变、异常时保留旧图集
+python scripts/preview-atlas.py     # 逐帧预览与母版裁块
 ```
 
-`lib/client.js` 是提交进仓库的构建产物：DSH 启动时直接读它，不会帮你编译，所以改完源码记得 `npm run build`
-再一起提交。
+`lib/client.js` 是提交进仓库的构建产物——DSH 启动时直接读它，不会帮你编译，所以改完源码记得
+`npm run build` 再一起提交。自己写桌宠时可以直接复用 `src/atlas.js`：它只描述 Codex atlas 的几何与动画表，
+不碰 DOM、没有依赖。
 
-要重新生成图集，把 [`docs/atlas-brief.md`](docs/atlas-brief.md) 直接发给画图方：里面写了交付规格、
-11 行各自该画什么，以及结构检查与动画目检的验收范围。`OK` 只代表结构通过，
-不能证明人物比例、脚掌接地或动作连贯。此次修复方式及复查记录见 [`docs/atlas-review.md`](docs/atlas-review.md)。
+## 项目结构
 
-自己写桌宠时可以直接复用 `src/atlas.js`：它只描述 Codex atlas 的几何与动画表（行、帧数、间隔、朝向），
-不碰 DOM，也没有依赖。
+```text
+pet-astra-yao/
+|-- package.json          # DSH 插件清单：dsh.bundle / dsh.client / exports
+|-- cordis.patch.yml      # 插件行：装进 profile 的那一条 insert
+|-- src/
+|   |-- index.js          # 服务端插件：会话跟踪、配置、/plugins/dsh-pet-astra-yao/*
+|   |-- state.js          # 会话事件 → 桌宠状态（纯函数）
+|   |-- atlas.js          # Codex atlas 契约：行列、帧数、方向、取帧
+|   |-- balance.js        # 余额：账户钱包 → API Key → 环境变量
+|   |-- account.js        # 钱包列表 → 余额（纯映射）
+|   |-- usage.js          # 今日花费：平台用量接口
+|   |-- config.js         # 配置归一化与 PATCH 校验
+|   `-- client.core.js    # 浏览器端源码（影子 DOM、拖拽、气泡、菜单、轮询）
+|-- scripts/              # build-client.mjs / verify.mjs / audit-atlas.py / pack-atlas.*
+|-- lib/client.js         # 构建产物（已提交）
+|-- test/                 # node:test + Pillow 回归
+|-- assets/atlas-source/  # 图集母版、逐行裁块、注册与打包清单
+|-- docs/                 # 需求文档、复查记录、逐状态预览、本文用图
+|-- pet.json              # Codex 宠物清单
+|-- spritesheet.webp      # 图集（同时被 DSH 以 /spritesheet 提供）
+`-- USAGE.md              # Codex 桌面端安装说明
+```
 
-## 原 Codex 用法
+## 素材与权利
 
-`pet.json` + `spritesheet.webp` 仍然是合法的 Codex 桌宠包，复制到
-`%USERPROFILE%\.codex\pets\astra-yao` 即可在 Codex Desktop 里使用，细节见 [USAGE.md](./USAGE.md)。
-
-## 素材说明
-
-像素美术与角色形象来自原仓库，角色「Astra Yao（耀嘉音）」及相关设定的权利归原权利人所有；
+像素美术与角色形象来自原仓库；角色「Astra Yao（耀嘉音）」及相关设定的权利归原权利人所有，
 本仓库只做桌宠资源的整理与 DSH 插件化，未附带额外许可证。
-
-图集原先存在跑动混跪姿、失败突然躺平、挥手换画、跨行比例变化和方向帧语义不完整等问题。
-2026-10 的修复恢复了源图完整鞋底，重画挥手、跳跃、失败、等待、工作、检查与注视组。
-打包器直接复制已审阅的固定格，不再重新定位、缩放或拼贴身体局部。
-结构检查与最终质量检查通过；方向过渡仍有人工复核提示，详见[复查记录](docs/atlas-review.md)和[交互预览](docs/atlas-qa/review.html)。
-
-| 位置 | 当前状态 | 播放 |
-| --- | --- | --- |
-| 第 1 行（向右跑） | 独立生成的向右跑全身帧；法杖仍固定在画面左侧 | 原生第 1 行，8 帧；不再额外 `flip` |
-| 第 5 行（failed） | 完整全身站立低落、叹气，无躺平或局部拼贴 | 完整 8 帧，不跳过任何一列 |
-| 第 7 行（工作中） | 站立专注、手指计数与思考，保持母版比例 | 6 帧，120 ms |
-| 第 8 行（review） | 完整全身托腮思考，保持站姿，细微目光变化和眨眼 | 完整 6 帧，360 ms |
-| 第 3 行（挥手） | 完整全身连续挥手，法杖固定在画面左侧，脚底对齐 | 单击播完整 4 帧，200 ms |
-| 第 9–10 行（16 朝向） | 360° 屏幕方向注视：上 → 右 → 下 → 左；头颈和上身自然跟随，下身与脚底稳定 | 默认跟随光标（280 px 内），每 22.5° 一格，2.5° 迟滞，可关闭 |
-
-新绘动作使用内置 imagegen，本轮源图、提示词记录和已注册的 11 行位于
-[`assets/atlas-source/coherent/`](assets/atlas-source/coherent/)。`scripts/pack-atlas.mjs` 调用 Python/Pillow
-打包，逐行检查审阅哈希，并验证无损编码前后所有 RGBA 像素一致。更换源图后必须重新提取、审阅和更新清单。
-
-判定标准写在 [`docs/atlas-brief.md`](docs/atlas-brief.md)：跨行动作共用同一人物设定，持杖手固定在画面左侧；16 格方向按屏幕坐标顺时针环绕，四个主方向不能反转。`python scripts/audit-atlas.py spritesheet.webp`
-会打印各行高度、宽度、基线、方向两行高度差及面部区域变化；客户端使用 2.5° 边界迟滞，避免在格子边界来回闪。
