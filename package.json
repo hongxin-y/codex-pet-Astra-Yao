@@ -1,6 +1,6 @@
 {
   "name": "dsh-pet-astra-yao",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Astra Yao — a Codex v2 sprite-atlas desktop pet for DeepSeek Harness, with session-state animation, a status bubble and a DeepSeek balance readout",
   "type": "module",
   "main": "src/index.js",
