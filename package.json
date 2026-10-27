@@ -1,7 +1,7 @@
 {
   "name": "dsh-pet-astra-yao",
   "version": "0.1.6",
-  "description": "Astra Yao 閳?a Codex-style desktop pet for DeepSeek Harness, rendered from the Codex v2 spritesheet atlas",
+  "description": "Astra Yao — a Codex v2 sprite-atlas desktop pet for DeepSeek Harness, with session-state animation, a status bubble and a DeepSeek balance readout",
   "type": "module",
   "main": "src/index.js",
   "exports": {
@@ -45,6 +45,10 @@
     "url": "git+https://github.com/hongxin-y/codex-pet-Astra-Yao.git"
   },
   "homepage": "https://github.com/hongxin-y/codex-pet-Astra-Yao#readme",
+  "bugs": {
+    "url": "https://github.com/hongxin-y/codex-pet-Astra-Yao/issues"
+  },
+  "license": "UNLICENSED",
   "peerDependencies": {
     "@deepseek-ai/cordis": ">=4.0.1-rc.1 <4.0.5-0 || >=4.0.5-0 <5.0.0-0",
     "@deepseek-ai/schemastery": ">=3.18.1-rc.1 <3.18.5-0 || >=3.18.5-0 <4.0.0-0"
