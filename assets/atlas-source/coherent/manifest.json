@@ -8,7 +8,7 @@
     1536,
     2288
   ],
-  "rgbaSha256": "2ea77c48b238d382ed707b701078b93d51f26d30b8307a754693520e3b88d54d",
+  "rgbaSha256": "3f0bc18369e1b56a1166606a85d1e0e6c13f82616ef5fb0b24a0fa971dc00531",
   "rows": [
     {
       "row": 0,
@@ -78,14 +78,14 @@
       "state": "look-row-9",
       "frames": 8,
       "file": "rows/09-look-row-9.png",
-      "sha256": "c846b768231aa6600f49a3ee1ebfb2e7e8d5ec8e1e48de78c7fc8560b47cda3e"
+      "sha256": "b0039a3a70ad63e460c0e1c6c02fceb5e46772cac73a18b96ef340fa93ffd687"
     },
     {
       "row": 10,
       "state": "look-row-10",
       "frames": 8,
       "file": "rows/10-look-row-10.png",
-      "sha256": "92d59ca382aaa464a7ff191a246473c7e648a65b9ebae30e83f7f9a8acddd14b"
+      "sha256": "60879624f67bf860c2ac6c3d4a8cf2be4b490bbd9983bc4b54a0a11c99a71953"
     }
   ]
 }
